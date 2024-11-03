@@ -1,26 +1,28 @@
 const settingsPageHtml = `
   <h2>Settings</h2>
   <div class="container">
+
+  <form id="addCategoryForm">
+    <label for="newCategory">Add New Category:</label>
+    <input type="text" id="newCategory" required>
+    <button type="submit">Add Category</button>
+  </form>
+
+  <h2>Existing Categories</h2>
+  <ul id="categoryList">
+    <!-- Categories will be listed here with delete buttons -->
+  </ul>
+
     <form id="settingsForm">
       <div class="form-group">
-        <label for="spreadsheetId">Spreadsheet ID</label>
-        <input type="text" id="spreadsheetId" placeholder="Enter Google Spreadsheet ID">
-      </div>
-      
-      <div class="form-group">
-        <label for="range">Range (should be something like 'Sheet1!A:B')</label>
-        <input type="text" id="range" placeholder="Enter range (e.g., Sheet1!A:B)">
-      </div>
-
-      <div class="form-group">
-        <label for="clientId">OAuth2 Client ID</label>
-        <input type="text" id="clientId" placeholder="Enter OAuth2 Client ID">
+        <label for="exampleID">Example ID</label>
+        <input type="text" id="exampleId">
       </div>
 
       <button type="submit" class="save-button">Save Settings</button>
     </form>
     <button id="backToMain" class="back-button">Back to Main</button>
-  </div>
+  </div> 
 
   <style>
     body {

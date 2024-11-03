@@ -87,7 +87,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     return true; // Indicate that the response will be sent asynchronously
   }
+
 });
 
 // On installation of extension, fetch the snippets once
-chrome.runtime.onInstalled.addListener(reloadSnippets);
+// chrome.runtime.onInstalled.addListener(reloadSnippets);
