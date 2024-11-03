@@ -10,6 +10,7 @@ const mainPageHtml = `
       <tr>
         <th>Hotkey</th>
         <th>Snippet</th>
+        <th>Tags</th>
         <th>Action</th>
       </tr>
     </thead>

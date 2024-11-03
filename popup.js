@@ -1,5 +1,6 @@
 let snippets = [];
 let categories = [];
+let mainContainer;
 
 // Function to check if snippets exist and render the main page
 function checkSnippetsAndRender() {
@@ -18,15 +19,16 @@ function checkSnippetsAndRender() {
     categories = Array.isArray(result.categories) ? result.categories : [];
 
     categories.forEach((category, index) => {
-      if (!category || typeof category.content === 'undefined') {
+      if (!category || typeof category === 'undefined') {
         categories.splice(index, 1);
       }
     });
-  };            
+  });            
 }
 
 // Function to render the settings page
 function renderSettingsPage() {
+  mainContainer = document.body; // Main container for the popup
   mainContainer.innerHTML = settingsPageHtml; // Load settings HTML
 
   // Load categories (tags) from storage and display them
@@ -103,6 +105,12 @@ function deleteCategory(category) {
       renderMainPage(); // After saving, go back to the main page
     });
   });
+
+  // Add new category
+  document.getElementById('backToMain').addEventListener('click', (event) => {
+    renderMainPage();
+  });
+ 
 }
 
 function addNewSnippetRow() {
@@ -228,9 +236,15 @@ function displaySnippets(snippets) {
 
     // Populate dropdown with categories
     categories.forEach((category) => {
+      console.log('reading this category ' + category);
       const option = document.createElement('option');
       option.value = category;
       option.textContent = category;
+      
+      if (!snippet.tags || typeof snippet.tags === 'undefined'){
+        snippet.tags = Array.isArray(snippet.tags) ? snippet.tags : [];
+      }
+
       if (snippet.tags.includes(category)) {
           option.selected = true; // Mark as selected if already tagged
       }
@@ -347,7 +361,7 @@ function displaySnippets(snippets) {
 
 // Function to render the main popup page
 function renderMainPage() {
-  const mainContainer = document.body; // Main container for the popup
+  mainContainer = document.body; // Main container for the popup
   mainContainer.innerHTML = mainPageHtml;
   
   setTimeout(() => {
