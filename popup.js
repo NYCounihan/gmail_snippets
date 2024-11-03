@@ -18,15 +18,16 @@ function checkSnippetsAndRender() {
     categories = Array.isArray(result.categories) ? result.categories : [];
 
     categories.forEach((category, index) => {
-      if (!category || typeof category.content === 'undefined') {
+      if (!category || typeof category === 'undefined') {
         categories.splice(index, 1);
       }
     });
-  };            
+  });            
 }
 
 // Function to render the settings page
 function renderSettingsPage() {
+  const mainContainer = document.body; // Main container for the popup
   mainContainer.innerHTML = settingsPageHtml; // Load settings HTML
 
   // Load categories (tags) from storage and display them
@@ -103,6 +104,13 @@ function deleteCategory(category) {
       renderMainPage(); // After saving, go back to the main page
     });
   });
+
+// Add event listener to return to main
+document.getElementById('backToMain').addEventListener('click', (event) => {
+  renderMainPage();
+});
+ 
+  
 }
 
 function addNewSnippetRow() {
@@ -231,6 +239,11 @@ function displaySnippets(snippets) {
       const option = document.createElement('option');
       option.value = category;
       option.textContent = category;
+
+      if (!category || typeof category === 'undefined') {
+        category = Array.isArray(result.category) ? result.category : [];
+      }
+
       if (snippet.tags.includes(category)) {
           option.selected = true; // Mark as selected if already tagged
       }
