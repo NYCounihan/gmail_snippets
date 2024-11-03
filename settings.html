@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Settings</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      background-color: #ffffff;
+      width: 600px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      font-size: 14px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+      font-size: 20px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    label {
+      font-size: 14px;
+      color: #333;
+    }
+    input {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .info {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 5px;
+    }
+    .save-button {
+      background-color: #ff385c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s, transform 0.3s;
+      margin-top: 20px;
+    }
+    .save-button:hover {
+      background-color: #e91e63;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <h1>Settings</h1>
+  <form id="settingsForm" class="container">
+    <!-- Display current values -->
+    <div>
+      <label for="exampleID">Example ID</label>
+      <div class="info" id="currentExampleId">No value set</div>
+      <input type="text" id="exampleId">
+    </div>
+
+    <button type="submit" class="save-button">Save Settings</button>
+  </form>
+
+  <script src="settings.js"></script>
+</body>
+</html>
