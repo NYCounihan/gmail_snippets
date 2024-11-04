@@ -4,7 +4,7 @@ body {
   padding: 20px;
   box-sizing: border-box;
   background-color: #ffffff;
-  width: 600px;
+  width: 800px;
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   font-size: 12px;
@@ -47,6 +47,18 @@ h1 {
   transform: translateY(-2px);
 }
 
+.snippet-content {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  font-size: 14px;
+  color: #333;
+  height: 100%; /* Fixed height */
+  width: 100%;
+  overflow-y: auto; /* Vertical scroll bar if needed */
+  max-height: 80px;
+}
+
 /* Table */
 table {
   width: 100%;
@@ -70,7 +82,7 @@ th {
 }
 
 td {
-  vertical-align: middle;
+  vertical-align: top;
   border: none;
   font-size: 12px;
 }
@@ -90,17 +102,17 @@ td {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: background-color 0.3s, transform 0.3s;
   font-size: 10px;
-  min-width: 60px;
+  min-width: 70px;
 }
 
 .snippet-button:hover {
-  background-color: #0056b3;
+  background-color: #ff385c;
   transform: translateY(-2px);
 }
 
 /* Formatting Options */
 .formatting-options {
-  margin-top: 5px;
+  margin-top: 8px;
 }
 
 .formatting-options button {
@@ -116,13 +128,47 @@ td {
   background-color: #e1e1e1;
 }
 
+.toolbar button {
+  margin-right: 4px;
+  padding: 4px 8px;
+  border: none;
+  background-color: #007BFF;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.toolbar button:hover {
+  background-color: #0056b3;
+}
+
+.save-button {
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: none;
+  background-color: #28a745;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.save-button:hover {
+  background-color: #ff385c;
+  transform: translateY(-2px);
+}
+
 /* Icon Styling */
 .button-icon, .snippet-icon {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   fill: white;
 }
 
+/* Hide the hotkey column */
+#snippetsTable th:nth-child(1),
+#snippetsTable td:nth-child(1) {
+  display: none;
+}
 
 /* Set a width for the Actions column */
 #snippetsTable th:nth-child(3),
@@ -130,9 +176,39 @@ td {
     width: 200px; /* Adjust this width as needed */
 }
 
-/* Adjusted Action Buttons Container for Same-Row Layout */
+/* Set a width for the Actions column */
+#snippetsTable th:nth-child(4),
+#snippetsTable td:nth-child(4) {
+    width: 130px; /* Adjust this width as needed */
+}
+
+/* Adjusted Action Buttons Container for Vertical Layout */
 .action-cell {
-    display: flex;
-    gap: 2px; /* Space between action buttons */
-    justify-content: center;
+  display: flex;
+  flex-direction: row; /* Stack buttons vertically */
+  gap: 5px; /* Space between action buttons */
+  justify-content: center;
+  align-items: center;
+}
+
+.styled-multiselect {
+  width: 100%;
+  padding: 0px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  font-size: 14px;
+  color: #333;
+  height: 100%; /* Fixed height */
+}
+
+.styled-multiselect option {
+  padding: 0px;
+  background-color: #fff;
+  color: #333;
+}
+
+.styled-multiselect option:checked {
+  background-color: #007bff;
+  color: #fff;
 }

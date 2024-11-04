@@ -19,4 +19,5 @@ const mainPageHtml = `
       <!-- Snippets will be displayed here -->
     </tbody>
   </table>
+  <div id="statusBar"></div>
 `;

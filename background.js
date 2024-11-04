@@ -70,11 +70,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
   
-      // Log each snippet after deletion for debugging
-      snippets.forEach((snippetX, x) => {
-        console.log("background.js :: snippet " + x + " is " + snippetX.content);
-      });
-  
       // Save the updated snippets array back to chrome.storage.local
       chrome.storage.local.set({ snippets }, () => {
         if (chrome.runtime.lastError) {
