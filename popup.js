@@ -1,6 +1,8 @@
 let snippets = [];
 let categories = [];
 
+// updating for monday meeting
+
 
 // Function to create a formatting button
 function createFormattingButton(innerHTML, title, command, promptText = null) {
