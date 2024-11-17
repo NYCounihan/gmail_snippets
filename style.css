@@ -191,7 +191,7 @@ td {
   align-items: center;
 }
 
-.styled-multiselect {
+.tag-container {
   width: 100%;
   padding: 0px;
   border: 1px solid #ccc;
@@ -202,13 +202,13 @@ td {
   height: 100%; /* Fixed height */
 }
 
-.styled-multiselect option {
+.styled-category-blank {
   padding: 0px;
   background-color: #fff;
   color: #333;
 }
 
-.styled-multiselect option:checked {
+.styled-category-selected {
   background-color: #007bff;
   color: #fff;
 }

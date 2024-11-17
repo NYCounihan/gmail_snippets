@@ -1,10 +1,7 @@
 let snippets = [];
 let categories = [];
+let activeRow = null;
 
-// updating for monday meeting
-
-
-// Function to create a formatting button
 function createFormattingButton(innerHTML, title, command, promptText = null) {
   const button = document.createElement('button');
   button.innerHTML = innerHTML;
@@ -22,7 +19,6 @@ function createFormattingButton(innerHTML, title, command, promptText = null) {
   return button;
 }
 
-// Function to check if snippets exist and render the main page
 function checkSnippetsAndRender() {
   chrome.storage.local.get('snippets', (result) => {
     snippets = Array.isArray(result.snippets) ? result.snippets : [];
@@ -33,6 +29,7 @@ function checkSnippetsAndRender() {
       } else {
         snippet.hotkey = snippet.hotkey ? snippet.hotkey : snippets.length;
         snippet.content = snippet.content ? snippet.content : "";
+        snippet.tags = snippet.tags ?? [];
       }
     });
 
@@ -51,7 +48,6 @@ function checkSnippetsAndRender() {
   });            
 }
 
-// Function to render the settings page
 function renderSettingsPage() {
   const mainContainer = document.body; // Main container for the popup
   mainContainer.innerHTML = settingsPageHtml; // Load settings HTML
@@ -141,71 +137,18 @@ document.getElementById('backToMain').addEventListener('click', (event) => {
 
 function addNewSnippetRow() {
   const snippetsContainer = document.getElementById('snippets');
-  const newSnippetRow = document.createElement('tr');
+  const newSnippet = {
+    hotkey: snippets.length,
+    content: 'Enter snippet content',
+    tags: []
+  };
+  snippets.push(newSnippet);
 
-  // Hotkey cell
-  const hotkeyCell = document.createElement('td');
-  const hotkeyInput = document.createElement('div');
-  hotkeyInput.setAttribute('contenteditable', 'true');
-  hotkeyInput.textContent = snippets.length;
-  hotkeyCell.appendChild(hotkeyInput);
-  newSnippetRow.appendChild(hotkeyCell);
-
-  // Snippet content cell
-  const snippetCell = document.createElement('td');
-  const snippetContent = document.createElement('div');
-  snippetContent.setAttribute('contenteditable', 'true');
-  snippetContent.classList.add('snippet-content');
-  snippetContent.textContent = 'Enter snippet content';
-  snippetCell.appendChild(snippetContent);
-
-  // Formatting buttons for editing (initially hidden)
-  const formatContainer = document.createElement('div');
-  formatContainer.classList.add('formatting-options', 'toolbar');
-
-  // Create and add formatting buttons
-  const boldButton = createFormattingButton('<strong>B</strong>', 'Bold', 'bold');
-  const italicButton = createFormattingButton('<em>I</em>', 'Italic', 'italic');
-  const linkButton = createFormattingButton('&#128279;', 'Link', 'createLink', 'Enter the URL:');
-
-  // Add buttons to the formatting container
-  formatContainer.appendChild(boldButton);
-  formatContainer.appendChild(italicButton);
-  formatContainer.appendChild(linkButton);
-  snippetCell.appendChild(formatContainer);
-  newSnippetRow.appendChild(snippetCell);
-
-  // Save button cell
-  const actionCell = document.createElement('td');
-  const saveButton = document.createElement('button');
-  saveButton.className = 'snippet-button';
-  saveButton.textContent = 'Save';
-  saveButton.addEventListener('click', () => {
-
-    formatContainer.style.display = 'none';
-    const newHotKey = hotkeyInput.textContent;
-    const newContent = snippetContent.innerHTML.trim();
-
-    if (newHotKey && newContent) {
-      const newSnippet = {
-        hotkey: newHotKey,
-        content: newContent,
-        tags: []
-      };
-      snippets.push(newSnippet);
-
-      // Save the new snippet to chrome.storage
-      chrome.storage.local.set({ snippets }, () => {
-        checkSnippetsAndRender();
-      });
-    } else {
-      alert('Both hotkey and content are required to add a new snippet.');
-    }
-  });
-
-  actionCell.appendChild(saveButton);
-  newSnippetRow.appendChild(actionCell);
-  snippetsContainer.appendChild(newSnippetRow);
+  const newSnippetRow = createSnippetRow(newSnippet, snippets.length);
+  if (newSnippetRow) {
+    snippetsContainer.appendChild(newSnippetRow);
+    rowStyle(newSnippetRow, 'editable');
+  }
 }
 
 function saveSnippet(index){
@@ -219,194 +162,261 @@ function saveSnippet(index){
   });
 }
 
+function rowStyle(snippetRow, style) {
+  const snippetContent = snippetRow.querySelector('.snippet-content');
+  const snippetCell = snippetRow.children[1];
+  const actionCell = snippetRow.children[3];
+  const tagContainer = snippetRow.querySelector('.tag-container');
+  const saveButton = snippetRow.querySelector('.snippet-button');
+  const formatContainer = snippetRow.querySelector('.formatting-options');
+
+  if (style === 'editable') {
+    snippetContent.setAttribute('contenteditable', 'true');
+    snippetContent.style.border = '2px dashed #007BFF'; // Highlight editable state
+    snippetContent.style.height = '80px';
+    snippetCell.style.height = '120px';
+    actionCell.style.flexDirection = 'column';
+    tagContainer.style.height = '80px'; // Expand tag container
+    snippetContent.focus();
+    saveButton.style.display = 'inline-block'; // Show Save button
+    formatContainer.style.display = 'block';  // Show formatting options
+  } else if (style === 'compact') {
+    snippetContent.setAttribute('contenteditable', 'false');
+    snippetContent.style.border = ''; // Remove inline border style to revert to base style
+    snippetContent.style.height = '100%';
+    snippetCell.style.height = '20px';
+    actionCell.style.flexDirection = 'row';
+    tagContainer.style.height = '20px';
+    tagContainer.style.overflowY = 'hidden'; // Hide tags if they overflow
+    saveButton.style.display = 'none'; // Hide Save button
+    formatContainer.style.display = 'none'; // Hide formatting options
+  }
+}
+
 function displaySnippets(snippets) {
   const snippetsContainer = document.getElementById('snippets');
   snippetsContainer.innerHTML = ''; // Clear any existing snippets
 
   snippets.forEach((snippet, index) => {
+    const snippetRow = createSnippetRow(snippet, index);
+    rowStyle (snippetRow, 'compact');
+    snippetsContainer.appendChild(snippetRow);
+  });
+}
 
-    const snippetRow = document.createElement('tr');
+function createSnippetRow(snippet, index) {
+  const snippetRow = document.createElement('tr');
 
-    // Hotkey cell
-    const hotkeyCell = document.createElement('td');
-    hotkeyCell.textContent = index;
-    snippetRow.appendChild(hotkeyCell);
+  const hotkeyCell = createHotkeyCell(index);
+  const snippetCell = createSnippetCell(snippet);
+  const tagsCell = createTagsCell(snippet, index);
+  const actionCell = createActionCell(snippet, index, snippetRow, snippetCell);
 
-    // Snippet content cell
-    const snippetCell = document.createElement('td');
-    const snippetContent = document.createElement('div');
-    snippetContent.innerHTML = snippet.content;
-    snippetContent.setAttribute('contenteditable', 'false'); // Initially not editable
-    snippetContent.classList.add('snippet-content');
-    snippetCell.appendChild(snippetContent);
+  snippetRow.appendChild(hotkeyCell);
+  snippetRow.appendChild(snippetCell);
+  snippetRow.appendChild(tagsCell);
+  snippetRow.appendChild(actionCell);
 
-    // Formatting buttons for editing (initially hidden)
-    const formatContainer = document.createElement('div');
-    formatContainer.style.display = 'none';
-    formatContainer.classList.add('formatting-options', 'toolbar');
+  addRowEventListeners(snippetRow, snippetCell, snippet, actionCell, tagsCell, index);
 
-    // Create and add formatting buttons
-    const boldButton = createFormattingButton('<strong>B</strong>', 'Bold', 'bold');
-    const italicButton = createFormattingButton('<em>I</em>', 'Italic', 'italic');
-    const linkButton = createFormattingButton('&#128279;', 'Link', 'createLink', 'Enter the URL:');
+  return snippetRow;
+}
 
-    // Add buttons to the formatting container
-    formatContainer.appendChild(boldButton);
-    formatContainer.appendChild(italicButton);
-    formatContainer.appendChild(linkButton);
-    snippetCell.appendChild(formatContainer);
-    snippetRow.appendChild(snippetCell);
+function createHotkeyCell(index) {
+  const hotkeyCell = document.createElement('td');
+  hotkeyCell.textContent = index;
+  return hotkeyCell;
+}
 
-    // Tags cell with multi-select dropdown
-    const tagsCell = document.createElement('td');
-    const tagSelect = document.createElement('select');
-    tagSelect.size = 1;
-    tagSelect.setAttribute('multiple', 'multiple');
-    tagSelect.classList.add('styled-multiselect'); // Add this line
+function createSnippetCell(snippet) {
+  const snippetValue = snippet?.content ?? "";
 
-    // Populate dropdown with categories
-    categories.forEach((category) => {
-      const option = document.createElement('option');
-      option.value = category;
-      option.textContent = category;
+  const snippetCell = document.createElement('td');
+  const snippetContent = document.createElement('div');
+  snippetContent.innerHTML = snippetValue;
+  snippetContent.setAttribute('contenteditable', 'false');
+  snippetContent.classList.add('snippet-content');
 
-      if (!category || typeof category === 'undefined') {
-        category = Array.isArray(result.category) ? result.category : [];
+  const formatContainer = createFormatContainer();
+  snippetCell.appendChild(snippetContent);
+  snippetCell.appendChild(formatContainer);
+
+  return snippetCell;
+}
+
+function createFormatContainer() {
+  const formatContainer = document.createElement('div');
+  formatContainer.style.display = 'none';
+  formatContainer.classList.add('formatting-options', 'toolbar');
+
+  const boldButton = createFormattingButton('<strong>B</strong>', 'Bold', 'bold');
+  const italicButton = createFormattingButton('<em>I</em>', 'Italic', 'italic');
+  const linkButton = createFormattingButton('&#128279;', 'Link', 'createLink', 'Enter the URL:');
+
+  formatContainer.appendChild(boldButton);
+  formatContainer.appendChild(italicButton);
+  formatContainer.appendChild(linkButton);
+
+  return formatContainer;
+}
+
+function createTagsCell(snippet, index) {
+  const tagsCell = document.createElement('td');
+  const tagContainer = document.createElement('div');
+  tagContainer.classList.add('tag-container');
+
+  categories.forEach((category) => {
+    const tagDiv = document.createElement('div');
+    tagDiv.classList.add('tag');
+    tagDiv.textContent = category;
+
+    if (snippet && snippet.tags && snippet.tags.includes(category)) {
+      tagDiv.classList.add('selected'); // Mark as selected if already tagged
+    }
+
+    tagDiv.addEventListener('click', () => {
+      if (tagDiv.classList.contains('selected')) {
+        tagDiv.classList.remove('selected');
+        snippet.tags = snippet.tags.filter(tag => tag !== category);
+      } else {
+        tagDiv.classList.add('selected');
+        snippet.tags.push(category);
       }
+      saveSnippet(index);
+    });
 
-      if (snippet.tags.includes(category)) {
-          option.selected = true; // Mark as selected if already tagged
+    tagContainer.appendChild(tagDiv);
+  });
+
+  tagsCell.appendChild(tagContainer);
+  return tagsCell;
+}
+
+function createActionCell(snippet, index, snippetRow, snippetCell) {
+  const actionCell = document.createElement('td');
+  actionCell.className = 'action-cell';
+
+  const insertButton = createInsertButton(snippet);
+  const deleteButton = createDeleteButton(snippet, index);
+  const saveButton = createSaveButton(snippet, index, snippetRow, snippetCell);
+
+  actionCell.appendChild(insertButton);
+  actionCell.appendChild(deleteButton);
+  actionCell.appendChild(saveButton);
+
+  return actionCell;
+}
+
+function createInsertButton(snippet) {
+  const insertButton = document.createElement('button');
+  insertButton.className = 'snippet-button';
+  insertButton.innerHTML = `
+    <svg class="snippet-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4Z"/>
+    </svg> Insert
+  `;
+
+  insertButton.onclick = () => {
+    insertButton.disabled = true;
+    setTimeout(() => {
+      insertButton.disabled = false;
+    }, 1000);
+  };
+
+  insertButton.addEventListener('click', () => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs.length > 0) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'insertSnippet', snippet: snippet.content }, (response) => {
+          if (chrome.runtime.lastError || !response || !response.success) {
+            console.error('Failed to insert snippet:', chrome.runtime.lastError);
+            alert('Failed to insert snippet. Please ensure you have an open Gmail draft.');
+          } else {
+            console.log('Snippet inserted successfully');
+          }
+        });
       }
-      tagSelect.appendChild(option);
     });
+  });
 
-    // Update snippet tags on selection change
-    tagSelect.addEventListener('change', () => {
-        snippet.tags = Array.from(tagSelect.selectedOptions).map(option => option.value);
-        saveSnippet(index);
-    });
+  return insertButton;
+}
 
-    tagsCell.appendChild(tagSelect);
-    snippetRow.appendChild(tagsCell);
-
-    // Action buttons cell
-    const actionCell = document.createElement('td');
-    actionCell.className = 'action-cell'; 
-
-    // Insert button
-    const insertButton = document.createElement('button');
-    insertButton.className = 'snippet-button';
-    insertButton.innerHTML = `
-      <svg class="snippet-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4Z"/>
-      </svg> Insert
-    `;
-
-    insertButton.onclick = () => {
-      insertButton.disabled = true;
-      setTimeout(() => {
-        insertButton.disabled = false;
-      }, 1000);
-    };
-
-    insertButton.addEventListener('click', () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs.length > 0) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'insertSnippet', snippet: snippet.content }, (response) => {
-            if (chrome.runtime.lastError || !response || !response.success) {
-              console.error('Failed to insert snippet:', chrome.runtime.lastError);
-              alert('Failed to insert snippet. Please ensure you have an open Gmail draft.');
-            } else {
-              console.log('Snippet inserted successfully');
-            }
-          });
-        }
-      });
-    });
-    actionCell.appendChild(insertButton);
-
-    // Delete button
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'snippet-button';
-    deleteButton.innerHTML = `
+function createDeleteButton(snippet, index) {
+  const deleteButton = document.createElement('button');
+  deleteButton.className = 'snippet-button';
+  deleteButton.innerHTML = `
     <svg class="snippet-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
       <path d="M9 2h6a1 1 0 0 1 1 1v1h5v2H3V4h5V3a1 1 0 0 1 1-1Zm10 6v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8Z"/>
     </svg> Delete
   `;
 
-    deleteButton.addEventListener('click', () => {
-      // Delete the snippet in chrome.storage
-      chrome.runtime.sendMessage({ action: 'deleteSnippet', index, snippet: snippets[index] }, (response) => {
-        if (response.success) {
-          console.log('Snippet deleted successfully!');
-          checkSnippetsAndRender();
-        } else {
-          console.error('Failed to delete snippet. Please try again.', 'error');
-        }
-      });
+  deleteButton.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'deleteSnippet', index, snippet: snippets[index] }, (response) => {
+      if (response.success) {
+        console.log('Snippet deleted successfully!');
+        checkSnippetsAndRender();
+      } else {
+        console.error('Failed to delete snippet. Please try again.', 'error');
+      }
     });
-    actionCell.appendChild(deleteButton);
-
-    // Save button
-    const saveButton = document.createElement('button');
-    saveButton.className = 'snippet-button';
-    saveButton.textContent = 'Save';
-    saveButton.style.display = 'none';
-    let saveButtonClicked = false;
-    saveButtonClicked = false;
-    saveButton.addEventListener('click', () => {
-      console.log('inside save :: saveButtonClicked is ' + saveButtonClicked);
-      saveButtonClicked = true; // Set flag to true when save button is clicked
-      console.log('inside save :: saveButtonClicked is ' + saveButtonClicked);
-      const updatedSnippet = snippetContent.innerHTML;
-      snippets[index].content = updatedSnippet;
-      saveSnippet(index);
-      snippetContent.setAttribute('contenteditable', 'false'); // Make read-only
-      snippetContent.style.border = 'none'; // Remove highlight
-      saveButton.style.display = 'none';
-      formatContainer.style.display = 'none';   // Hide formatting options after saving
-    });
-
-    actionCell.appendChild(saveButton);
-    snippetRow.appendChild(actionCell);
-
-      // Make snippet content editable on click
-  snippetRow.addEventListener('click', () => {
-    snippetContent.setAttribute('contenteditable', 'true');
-    snippetContent.style.border = '2px dashed #007BFF'; // Highlight editable state
-    snippetContent.style.height = '80px';
-    snippetCell.style.height = '120px'; 
-    actionCell.style.flexDirection = 'column';
-    tagSelect.size = 6;
-    snippetContent.focus();
-    saveButton.style.display = 'inline-block'; // Show Save button
-    formatContainer.style.display = 'block';  // Show formatting options
   });
 
-  // Handle focusout event to save changes and hide formatting options
-  snippetRow.addEventListener('focusout', (event) => {
-    console.log('Focus out event and saveButtonClicked is ' + saveButtonClicked);
-    // Check if the new focused element is still within the snippetRow
-    if (!snippetRow.contains(event.relatedTarget) || !saveButtonClicked) {
-      snippetContent.setAttribute('contenteditable', 'false');
-      snippetContent.style.border = ''; // Remove inline border style to revert to base style
-      snippetContent.style.height = '100%';
-      snippetCell.style.height = '100%';
-      actionCell.style.flexDirection = 'row';
-      tagSelect.size = 1;
-      saveButton.style.display = 'none'; // Hide Save button
-      formatContainer.style.display = 'none'; // Hide formatting options
-      // Save the updated content
-      snippet.content = snippetContent.innerHTML;
-      saveSnippet(index);
-    }
-    saveButtonClicked = false; // Reset flag after handling focusout
-    console.log('reset :: saveButtonClicked is ' + saveButtonClicked);
-  });
-
-    snippetsContainer.appendChild(snippetRow);
-  }); // end of snippets for each loop
+  return deleteButton;
 }
+
+function createSaveButton(snippet, index, snippetRow, snippetCell) {
+  const saveButton = document.createElement('button');
+  saveButton.className = 'snippet-button';
+  saveButton.textContent = 'Save';
+  saveButton.style.display = 'none';
+
+  saveButton.addEventListener('click', () => {
+    const snippetContent = snippetCell.querySelector('.snippet-content');
+    const updatedSnippet = snippetContent.innerHTML;
+    snippets[index].content = updatedSnippet;
+    saveSnippet(index);
+    rowStyle(snippetRow, 'compact');
+  });
+
+  return saveButton;
+}
+
+function addRowEventListeners(snippetRow, snippetCell, snippet, actionCell, tagsCell, index) {
+  const snippetContent = snippetCell.querySelector('.snippet-content');
+  
+  snippetRow.addEventListener('click', (event) => {
+    event.stopPropagation(); // Prevent the event from bubbling up to the document
+      if (activeRow != snippetRow){
+      rowStyle(snippetRow, 'editable');
+      if (activeRow){
+        rowStyle(activeRow, 'compact');
+          const activeSnippetContent = activeRow.querySelector('.snippet-content').innerHTML;
+          const activeIndex = parseInt(activeRow.querySelector('td').innerHTML, 10);
+          snippets[activeIndex].content = activeSnippetContent;
+          saveSnippet(activeIndex);
+        }
+      }
+      activeRow = snippetRow;
+  });
+
+}
+
+// Event listener for clicks on the document
+document.addEventListener('click', () => {
+  if (activeRow) {
+    rowStyle(activeRow, 'compact');
+    activeRow = null;
+  }
+});
+
+// Event listener for when the document loses focus
+window.addEventListener('blur', () => {
+  if (activeRow) {
+    rowStyle(activeRow, 'compact');
+    activeRow = null;
+  }
+});
+
 
 // Function to render the main popup page
 function renderMainPage() {
@@ -432,8 +442,6 @@ function renderMainPage() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-
   // Initially check snippets when the popup loads
   checkSnippetsAndRender();
 });
-
