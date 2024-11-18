@@ -20,32 +20,61 @@ function createFormattingButton(innerHTML, title, command, promptText = null) {
 }
 
 function checkSnippetsAndRender() {
-  chrome.storage.local.get('snippets', (result) => {
-    snippets = Array.isArray(result.snippets) ? result.snippets : [];
 
-    snippets.forEach((snippet, index) => {
-      if (!snippet) {
-        snippets.splice(index, 1);
-      } else {
-        snippet.hotkey = snippet.hotkey ? snippet.hotkey : snippets.length;
-        snippet.content = snippet.content ? snippet.content : "";
-        snippet.tags = snippet.tags ?? [];
-      }
-    });
-
-    renderMainPage();
+  chrome.runtime.sendMessage({ action: 'getSnippets', }, (response) => {
+    if (response.success) {
+      console.log('Retrieved Snippets');
+      snippets = response.snippets;
+      renderMainPage();
+    } else {
+      console.error('Failed to retrieve snippets', 'error');
+    }
   });
 
   // Load available categories from storage
   chrome.storage.local.get('categories', (result) => {
     categories = Array.isArray(result.categories) ? result.categories : [];
-
     categories.forEach((category, index) => {
       if (!category || typeof category === 'undefined') {
         categories.splice(index, 1);
       }
     });
   });            
+};
+
+// Create a div for each category inside the div with class "category-container"
+function renderCategories() {
+  const categoryContainer = document.querySelector('.category-container');
+  const selectedCategories = new Set();
+
+  categories.forEach((category) => {
+    const categoryDiv = document.createElement('div');
+    categoryDiv.classList.add('category');
+    categoryDiv.textContent = category;
+
+    categoryDiv.addEventListener('click', () => {
+      if (categoryDiv.classList.contains('selected')) {
+        categoryDiv.classList.remove('selected');
+        selectedCategories.delete(category);
+      } else {
+        categoryDiv.classList.add('selected');
+        selectedCategories.add(category);
+      }
+      filterSnippetsByCategory();
+    });
+
+    categoryContainer.appendChild(categoryDiv);
+  });
+}
+
+function filterSnippetsByCategory() {
+  const selectedCategories = new Set(
+    Array.from(document.querySelectorAll('.category.selected')).map(categoryDiv => categoryDiv.textContent)
+  );
+  const filteredSnippets = snippets.filter(snippet => {
+    return Array.from(selectedCategories).every(category => snippet.tags.includes(category));
+  });
+  displaySnippets(filteredSnippets);
 }
 
 function renderSettingsPage() {
@@ -135,25 +164,35 @@ document.getElementById('backToMain').addEventListener('click', (event) => {
   
 }
 
-function addNewSnippetRow() {
+function addNewSnippet() {
   const snippetsContainer = document.getElementById('snippets');
   const newSnippet = {
     hotkey: snippets.length,
     content: 'Enter snippet content',
     tags: []
   };
+
+  chrome.runtime.sendMessage({ action: 'addSnippet', snippet: newSnippet}, (response) => {
+    if (response.success) {
+      console.log('Snippet saved successfully!');
+    } else {
+      console.error('Failed to save snippet. Please try again.', 'error');
+    }
+  });
+
+  const newSnippetRow = createSnippetRow(newSnippet, newSnippet.hotkey);
   snippets.push(newSnippet);
 
-  const newSnippetRow = createSnippetRow(newSnippet, snippets.length);
   if (newSnippetRow) {
     snippetsContainer.appendChild(newSnippetRow);
     rowStyle(newSnippetRow, 'editable');
+    activeRow = newSnippetRow;
   }
 }
 
-function saveSnippet(index){
+function updateSnippet(index){
   // Save the updated snippet to chrome.storage
-  chrome.runtime.sendMessage({ action: 'saveSnippet', index, snippet: snippets[index] }, (response) => {
+  chrome.runtime.sendMessage({ action: 'updateSnippet', index, snippet: snippets[index] }, (response) => {
     if (response.success) {
       console.log('Snippet saved successfully!');
     } else {
@@ -167,28 +206,25 @@ function rowStyle(snippetRow, style) {
   const snippetCell = snippetRow.children[1];
   const actionCell = snippetRow.children[3];
   const tagContainer = snippetRow.querySelector('.tag-container');
-  const saveButton = snippetRow.querySelector('.snippet-button');
   const formatContainer = snippetRow.querySelector('.formatting-options');
 
   if (style === 'editable') {
     snippetContent.setAttribute('contenteditable', 'true');
     snippetContent.style.border = '2px dashed #007BFF'; // Highlight editable state
-    snippetContent.style.height = '80px';
-    snippetCell.style.height = '120px';
+    snippetContent.style.height = 'auto';
+    snippetCell.style.height = 'auto';
     actionCell.style.flexDirection = 'column';
-    tagContainer.style.height = '80px'; // Expand tag container
+    tagContainer.style.height = 'auto';
     snippetContent.focus();
-    saveButton.style.display = 'inline-block'; // Show Save button
     formatContainer.style.display = 'block';  // Show formatting options
   } else if (style === 'compact') {
     snippetContent.setAttribute('contenteditable', 'false');
     snippetContent.style.border = ''; // Remove inline border style to revert to base style
     snippetContent.style.height = '100%';
-    snippetCell.style.height = '20px';
+    snippetCell.style.height = '100%';
     actionCell.style.flexDirection = 'row';
     tagContainer.style.height = '20px';
     tagContainer.style.overflowY = 'hidden'; // Hide tags if they overflow
-    saveButton.style.display = 'none'; // Hide Save button
     formatContainer.style.display = 'none'; // Hide formatting options
   }
 }
@@ -198,7 +234,7 @@ function displaySnippets(snippets) {
   snippetsContainer.innerHTML = ''; // Clear any existing snippets
 
   snippets.forEach((snippet, index) => {
-    const snippetRow = createSnippetRow(snippet, index);
+    const snippetRow = createSnippetRow(snippet, snippet.hotkey);
     rowStyle (snippetRow, 'compact');
     snippetsContainer.appendChild(snippetRow);
   });
@@ -265,10 +301,16 @@ function createTagsCell(snippet, index) {
   const tagContainer = document.createElement('div');
   tagContainer.classList.add('tag-container');
 
+  if (snippet){
+    snippet.tags = snippet?.tags ?? [];
+    snippet.hotkey = snippet?.hotkey ?? [];
+  }
+
   categories.forEach((category) => {
     const tagDiv = document.createElement('div');
     tagDiv.classList.add('tag');
     tagDiv.textContent = category;
+    
 
     if (snippet && snippet.tags && snippet.tags.includes(category)) {
       tagDiv.classList.add('selected'); // Mark as selected if already tagged
@@ -280,9 +322,10 @@ function createTagsCell(snippet, index) {
         snippet.tags = snippet.tags.filter(tag => tag !== category);
       } else {
         tagDiv.classList.add('selected');
+        snippet.tags = snippet?.tags ?? [];
         snippet.tags.push(category);
       }
-      saveSnippet(index);
+      updateSnippet(snippet.hotkey);
     });
 
     tagContainer.appendChild(tagDiv);
@@ -298,11 +341,9 @@ function createActionCell(snippet, index, snippetRow, snippetCell) {
 
   const insertButton = createInsertButton(snippet);
   const deleteButton = createDeleteButton(snippet, index);
-  const saveButton = createSaveButton(snippet, index, snippetRow, snippetCell);
 
   actionCell.appendChild(insertButton);
   actionCell.appendChild(deleteButton);
-  actionCell.appendChild(saveButton);
 
   return actionCell;
 }
@@ -364,23 +405,6 @@ function createDeleteButton(snippet, index) {
   return deleteButton;
 }
 
-function createSaveButton(snippet, index, snippetRow, snippetCell) {
-  const saveButton = document.createElement('button');
-  saveButton.className = 'snippet-button';
-  saveButton.textContent = 'Save';
-  saveButton.style.display = 'none';
-
-  saveButton.addEventListener('click', () => {
-    const snippetContent = snippetCell.querySelector('.snippet-content');
-    const updatedSnippet = snippetContent.innerHTML;
-    snippets[index].content = updatedSnippet;
-    saveSnippet(index);
-    rowStyle(snippetRow, 'compact');
-  });
-
-  return saveButton;
-}
-
 function addRowEventListeners(snippetRow, snippetCell, snippet, actionCell, tagsCell, index) {
   const snippetContent = snippetCell.querySelector('.snippet-content');
   
@@ -392,8 +416,11 @@ function addRowEventListeners(snippetRow, snippetCell, snippet, actionCell, tags
         rowStyle(activeRow, 'compact');
           const activeSnippetContent = activeRow.querySelector('.snippet-content').innerHTML;
           const activeIndex = parseInt(activeRow.querySelector('td').innerHTML, 10);
-          snippets[activeIndex].content = activeSnippetContent;
-          saveSnippet(activeIndex);
+          if (snippets[activeIndex]){
+            snippets[activeIndex].content = snippets[activeIndex].content ?? "";
+            snippets[activeIndex].content = activeSnippetContent;
+            updateSnippet(snippets[activeIndex].hotkey);
+          }
         }
       }
       activeRow = snippetRow;
@@ -405,6 +432,13 @@ function addRowEventListeners(snippetRow, snippetCell, snippet, actionCell, tags
 document.addEventListener('click', () => {
   if (activeRow) {
     rowStyle(activeRow, 'compact');
+    const activeSnippetContent = activeRow.querySelector('.snippet-content').innerHTML;
+    const activeIndex = parseInt(activeRow.querySelector('td').innerHTML, 10);
+      if (snippets[activeIndex]){
+        snippets[activeIndex].content = snippets[activeIndex].content ?? "";
+        snippets[activeIndex].content = activeSnippetContent;
+        updateSnippet(activeIndex);
+      }
     activeRow = null;
   }
 });
@@ -413,10 +447,16 @@ document.addEventListener('click', () => {
 window.addEventListener('blur', () => {
   if (activeRow) {
     rowStyle(activeRow, 'compact');
+    const activeSnippetContent = activeRow.querySelector('.snippet-content').innerHTML;
+    const activeIndex = parseInt(activeRow.querySelector('td').innerHTML, 10);
+      if (snippets[activeIndex]){
+        snippets[activeIndex].content = snippets[activeIndex].content ?? "";
+        snippets[activeIndex].content = activeSnippetContent;
+        updateSnippet(activeIndex);
+      }
     activeRow = null;
   }
 });
-
 
 // Function to render the main popup page
 function renderMainPage() {
@@ -427,7 +467,6 @@ function renderMainPage() {
     displaySnippets(snippets);
   }, 500);
 
-  // Attach event listeners to the buttons after re-rendering
   document.getElementById('openSettings').addEventListener('click', () => {
     renderSettingsPage(); // Render the settings page when "Settings" button is clicked
   });
@@ -437,8 +476,10 @@ function renderMainPage() {
   });
 
   document.getElementById('newSnippet').addEventListener('click', () => {
-    addNewSnippetRow();
+    addNewSnippet();
   });
+
+  renderCategories();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

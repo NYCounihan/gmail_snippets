@@ -1,88 +1,138 @@
 console.log("Background script loaded");
-
-// Store snippets globally
 let snippets = [];
 
-// Fetch snippets from Chrome storage
-function fetchSnippets(callback) {
+// get snippets from Chrome storage
+function getSnippets(callback) {
   chrome.storage.local.get('snippets', (result) => {
-    snippets = result.snippets || [];
+    snippets = Array.isArray(result.snippets) ? result.snippets : [];
+    logSnippetStorage(snippets,"getSnippets");
     callback(snippets);
   });
 }
 
-// Reload snippets from Chrome storage
-const reloadSnippets = () => {
-  console.log('Inside reload snippets');
-  fetchSnippets((snippets) => {
-    chrome.storage.local.set({ snippets }, () => {
-      console.log('Snippets stored:', snippets);
-      // Notify all tabs about the updated snippets
-      chrome.tabs.query({}, (tabs) => {
-        for (const tab of tabs) {
-          if (tab.url && tab.url.includes('mail.google.com')) {
-            chrome.tabs.sendMessage(tab.id, { action: 'updateSnippets', snippets });
-          }
-        }
-      });
-    });
+function checkSnippetsArray (snippets) {
+  // filter out null snippets
+  snippets = snippets.filter(snippet => snippet !== null);
+  // update remaining snippets
+  snippets.forEach((snippet, index) => {
+    snippet.hotkey = index;
+    snippet.content = snippet?.content ?? "";
+    snippet.tags = snippet?.tags ?? [];
   });
-};
+  return snippets;
+}
+
+// set snippets from Chrome storage
+function setSnippets(snippets, callback) {
+  snippets = checkSnippetsArray(snippets);
+  chrome.storage.local.set({snippets}, () => {
+    logSnippetStorage(snippets,"setSnippets");
+    callback(true);
+  });
+}
+
+// set snippets from Chrome storage
+function addSnippet(snippet, callback) {
+  snippets = checkSnippetsArray(snippets);
+  snippets.push(snippet);
+  chrome.storage.local.set({snippets}, () => {
+    logSnippetStorage(snippets,"addSnippets");
+    callback(true);
+  });
+}
+
+// delete snippet from Chrome storage
+function deleteSnippet(index, callback) {
+  // Check if the index is within bounds
+  if (index >= 0 && index < snippets.length) {
+    snippets.splice(index, 1); // Remove the specific item at the index
+    snippets = checkSnippetsArray(snippets);
+    chrome.storage.local.set({snippets}, () => {
+      logSnippetStorage(snippets,"deleteSnippets");
+      callback(true);
+    });
+  } else {
+    console.error("Invalid index: ", index);
+    callback(false);
+  }
+}
+
+function logSnippetStorage(snippets,caller) {
+  console.log(caller + " storage action");
+  console.log("******************************************");
+  if (snippets) {
+    snippets.forEach((snippet, index) => {
+      if (snippet) {
+        snippet.content = snippet.content ?? "";
+        snippet.tags = snippet.tags ?? [];
+        console.log("snippet ID: " + snippet.hotkey + " -- snippet content: " + snippet.content + " -- snippet tags: " + JSON.stringify(snippet.tags));
+      }
+    });
+  }
+}
+
+// function will fetch snippets, update 
+function reloadSnippets() {
+  // Notify all tabs about the updated snippets
+  chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      if (tab.url && tab.url.includes('mail.google.com')) {
+        console.log('Reloading snippets for Gmail tab:', tab.id);
+        chrome.tabs.sendMessage(tab.id, { action: 'updateSnippets', snippets }, (response) => {
+          if (response && response.success) {
+            console.log('tabs notified successfully!');
+          } else {
+            console.error('Failed to notify tabs.', 'error');
+          }
+        });
+      }
+    }
+  });
+  return true;
+}
 
 // This is called only by popup.js to fetch snippets
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'fetchSnippets') {
-    fetchSnippets((snippets) => {
+  if (request.action === 'getSnippets') {
+    getSnippets((snippets) => {
+      //reloadSnippets();
       sendResponse({ success: true, snippets });
     });
-    return true; // Required to indicate that sendResponse will be called asynchronously
+    return true;
   }
 
-  if (request.action === 'saveSnippet') {
-    const { index, snippet } = request;
+  if (request.action === 'updateSnippet') {
+    const {index, snippet } = request;
     snippets[index] = snippet;
 
-    chrome.storage.local.set({ snippets }, () => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      } else {
-        sendResponse({ success: true });
-      }
+    setSnippets(snippets, (response) => {
+      //reloadSnippets();
+      sendResponse({ success: response });
     });
+    return true;
+  }
 
-    return true; // Indicate that the response will be sent asynchronously
+  if (request.action === 'addSnippet') {
+    const {snippet} = request;
+
+    addSnippet(snippet, (response) => {
+      //reloadSnippets();
+      sendResponse({ success: response });
+    });
+    return true;
   }
 
   if (request.action === 'deleteSnippet') {
-    const { index, snippet } = request;
-    console.log("background.js deleting " + index + " and snippet " + snippet.content);
-  
-    // Fetch the latest snippets from chrome.storage.local before modifying
-    chrome.storage.local.get('snippets', (result) => {
-      let snippets = result.snippets || [];
-  
-      // Check if the index is within bounds
-      if (index >= 0 && index < snippets.length) {
-        snippets.splice(index, 1); // Remove the specific item at the index
-      } else {
-        console.error("Invalid index: ", index);
-        sendResponse({ success: false, error: "Invalid index" });
-        return;
-      }
-  
-      // Save the updated snippets array back to chrome.storage.local
-      chrome.storage.local.set({ snippets }, () => {
-        if (chrome.runtime.lastError) {
-          sendResponse({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          sendResponse({ success: true });
-        }
-      });
-    });
+    const { index } = request;
 
-    return true; // Indicate that the response will be sent asynchronously
+    deleteSnippet(index, (response) => {
+      //reloadSnippets();
+      sendResponse({ success: response });
+    });
+    return true;
   }
 
+  return false;
 });
 
 // On installation of extension, fetch the snippets once

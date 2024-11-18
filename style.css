@@ -48,15 +48,13 @@ h1 {
 }
 
 .snippet-content {
+  padding: 2px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  background-color: #f9f9f9;
-  font-size: 14px;
+  background-color: #fff;
+  font-size: 12px;
   color: #333;
-  height: 100%; /* Fixed height */
-  width: 100%;
-  overflow-y: auto; /* Vertical scroll bar if needed */
-  max-height: 80px;
+  overflow-y: auto; /* Add vertical scroll if content overflows */
 }
 
 /* Table */
@@ -71,7 +69,7 @@ table {
 
 th, td {
   border: none;
-  padding: 8px;
+  padding: 2px;
   text-align: left;
 }
 
@@ -92,27 +90,29 @@ td {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 2px;
   background-color: #acb0b7;
   color: white;
   border: none;
-  padding: 5px 10px;
+  padding: 4px 8px;
   cursor: pointer;
-  border-radius: 8px;
+  margin: 2px;
+  font-size: 12px;
+  border-radius: 5px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: background-color 0.3s, transform 0.3s;
-  font-size: 10px;
-  min-width: 70px;
 }
 
 .snippet-button:hover {
-  background-color: #ff385c;
+  background-color: #e91e63;
   transform: translateY(-2px);
 }
 
 /* Formatting Options */
 .formatting-options {
-  margin-top: 8px;
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
 }
 
 .formatting-options button {
@@ -142,20 +142,6 @@ td {
   background-color: #0056b3;
 }
 
-.save-button {
-  margin-top: 8px;
-  padding: 4px 8px;
-  border: none;
-  background-color: #28a745;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.save-button:hover {
-  background-color: #ff385c;
-  transform: translateY(-2px);
-}
 
 /* Icon Styling */
 .button-icon, .snippet-icon {
@@ -164,10 +150,15 @@ td {
   fill: white;
 }
 
+.snippet-icon {
+  width: 12px; /* Adjust icon size */
+  height: 12px; /* Adjust icon size */
+}
+
 /* Hide the hotkey column */
 #snippetsTable th:nth-child(1),
 #snippetsTable td:nth-child(1) {
-  display: none;
+  width: 10px;
 }
 
 /* Set a width for the Actions column */
@@ -186,18 +177,42 @@ td {
 .action-cell {
   display: flex;
   flex-direction: row; /* Stack buttons vertically */
-  gap: 5px; /* Space between action buttons */
+  gap: 2px; /* Space between action buttons */
   justify-content: center;
   align-items: center;
 }
 
+/* Style for the tag container */
 .tag-container {
-  width: 100%;
-  padding: 0px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px; /* Space between tags */
+  padding: 5px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background-color: #f9f9f9;
-  font-size: 14px;
+}
+
+/* Style for individual tags */
+.tag {
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Style for selected tags */
+.tag.selected {
+  background-color: #007BFF;
+  color: white;
+}
+
+.tag-container {
+  width: 100%;
+  padding: 1px;
+  font-size: 12px;
   color: #333;
   height: 100%; /* Fixed height */
 }
@@ -211,4 +226,36 @@ td {
 .styled-category-selected {
   background-color: #007bff;
   color: #fff;
+}
+
+.category-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center; /* Centers categories horizontally */
+  width: 100%; /* Takes full width of parent */
+  padding: 4px;
+  flex-wrap: wrap; /* Allows categories to wrap to next line */
+}
+
+.category {
+  background-color: #acb0b7;
+  margin: 3px;
+  padding: 4px 10px;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.category.selected {
+  background-color: #007BFF;;
+}
+
+.category:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 3px rgba(0,0,0,0.1);
 }

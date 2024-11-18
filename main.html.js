@@ -5,10 +5,12 @@ const mainPageHtml = `
     <button id="newSnippet">Add Snippet</button>
     <button id="openSettings">Settings</button>
   </div>
+  <div class="category-container">
+  </div>
   <table id="snippetsTable">
     <thead>
       <tr>
-        <th>Hotkey</th>
+        <th>ID</th>
         <th>Snippet</th>
         <th>Tags</th>
         <th>Action</th>

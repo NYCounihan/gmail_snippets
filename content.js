@@ -1,16 +1,8 @@
 console.log("Content script loaded");
 
-// Store snippets globally
-let snippets = [];
-
 // Listen for messages from the background script to update snippets or handle snippet insertion
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'updateSnippets') {
-    console.log('Message received in content.js: updateSnippets');
-    // Update the snippets from the background script
-    snippets = request.snippets || [];
-    sendResponse({ success: true });
-  } else if (request.action === 'insertSnippet') {
+  if (request.action === 'insertSnippet') {
     console.log('Message received in content.js: insertSnippet');
     const snippet = request.snippet;
     const success = insertSnippet(snippet);
