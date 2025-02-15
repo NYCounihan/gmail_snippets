@@ -1,3 +1,5 @@
+import NotificationService from '../services/notificationService.js';
+
 /*
 Future Expansion:
 - Add multiple model support via aiConfig.json
@@ -9,6 +11,8 @@ Future Expansion:
 const DEFAULT_TIMEOUT = 10000;
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_TOP_K = 40;
+
+const notificationService = new NotificationService();
 
 export default class AIHandler {
   constructor() {
@@ -62,6 +66,7 @@ export default class AIHandler {
 
   async processEmailContext(emailContext) {
     this.showLoading();
+    notificationService.showNotification({ message: 'AI analyzing email context...' });
     chrome.runtime.sendMessage({ 
       action: 'updateStatusBar',
       status: 'AI analyzing email context...'
@@ -78,12 +83,14 @@ export default class AIHandler {
         action: 'updateStatusBar',
         status: 'Email context analyzed and ready'
       });
+      notificationService.showNotification({ message: 'Email context analyzed and ready' });
     } catch (error) {
       console.error('Failed to process email context:', error);
       chrome.runtime.sendMessage({ 
         action: 'updateStatusBar',
         status: 'Failed to analyze email context'
       });
+      notificationService.showNotification({ message: 'Failed to analyze email context' });
     } finally {
       this.hideLoading();
     }
@@ -106,6 +113,7 @@ export default class AIHandler {
   }
 
   async processWithAI(snippet, emailData) {
+    console.log('Processing snippet with AI:', emailData.summary);
     try {
       if (!this.session) {
         await this.initializeSession();
@@ -138,6 +146,7 @@ export default class AIHandler {
 
   async processSnippet(snippet, emailContext) {
     this.showLoading();
+    notificationService.showNotification({ message: 'Processing snippet with AI...' });
     
     return new Promise((resolve) => {
       const timeoutId = setTimeout(() => {
@@ -150,11 +159,13 @@ export default class AIHandler {
         .then(response => {
           clearTimeout(timeoutId);
           this.hideLoading();
+          notificationService.showNotification({ message: 'Snippet processing complete.' });
           resolve(response);
         })
         .catch(() => {
           clearTimeout(timeoutId);
           this.hideLoading();
+          notificationService.showNotification({ message: 'Snippet processing failed.' });
           resolve({ modified: false, content: snippet });
         });
     });
@@ -162,14 +173,19 @@ export default class AIHandler {
 
   async extractEmailContext() {
     try {
-      const result = await chrome.storage.local.get(['currentEmailSummary', 'currentEmailContext']);
-      if (!result.currentEmailSummary) {
-        throw new Error('No email summary available');
-      }
-      return {
-        summary: result.currentEmailSummary,
-        context: result.currentEmailContext
-      };
+      // Use sendMessage to get data from background script
+      chrome.runtime.sendMessage({ action: 'getEmailContext' }, (response) => {
+
+        if (!response || !response.success || !response.summary) {
+          console.error('No email summary available');
+          return { summary: '', context: {} };
+        }
+
+        return {
+          summary: response.summary,
+          context: response.context
+        };
+      });
     } catch (error) {
       console.error('Failed to get email context:', error);
       return { summary: '', context: {} };

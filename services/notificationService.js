@@ -30,9 +30,39 @@ export default class NotificationService {
     }
 
     async displayNotification(notification) {
-        // Logic to display notification (status bar or tooltip)
-        console.log('Displaying notification:', notification);
+        if (this.isPopupActive) {
+            // Send message to popup to update status bar
+            chrome.runtime.sendMessage({ action: 'updateStatusBar', status: notification.message });
+        } else {
+            // Show a subtle notification popup
+            this.showSubtleNotification(notification.message);
+        }
         return new Promise(resolve => setTimeout(resolve, 2000)); // Simulate display time
+    }
+
+    showSubtleNotification(message) {
+        const notificationDiv = document.createElement('div');
+        notificationDiv.classList.add('subtle-notification');
+        notificationDiv.textContent = message;
+
+        // Style the notification
+        notificationDiv.style.position = 'fixed';
+        notificationDiv.style.top = '10px';
+        notificationDiv.style.right = '10px';
+        notificationDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        notificationDiv.style.color = 'white';
+        notificationDiv.style.padding = '10px';
+        notificationDiv.style.borderRadius = '5px';
+        notificationDiv.style.zIndex = '10000';
+        notificationDiv.style.display = 'block';
+
+        document.body.appendChild(notificationDiv);
+
+        // Remove the notification after 4 seconds
+        setTimeout(() => {
+            notificationDiv.style.display = 'none';
+            notificationDiv.remove();
+        }, 4000);
     }
 
     delay(ms) {

@@ -1,3 +1,6 @@
+import NotificationService from './services/notificationService.js';
+const notificationService = new NotificationService();
+
 console.log("Content script loaded");
 
 // Listen for messages from the background script to update snippets or handle snippet insertion
@@ -59,15 +62,33 @@ function insertHTMLAtCursor(element, html) {
 }
 
 function extractEmailDetails() {
-  const messageBody = document.querySelector('div[aria-label="Message Body"]');
-  const fromElement = document.querySelector('[email][name="from"]');
-  const toElement = document.querySelector('[email][name="to"]');
-  const subjectElement = document.querySelector('[name="subjectbox"]');
+  let messageBody, fromElement, toElement, subjectElement;
+
+  // 1. Prioritize the focused element
+  if (document.activeElement && document.activeElement.matches('div[aria-label="Message Body"]')) {
+    messageBody = document.activeElement;
+  } else {
+    // 2. Look for known selectors in the main document
+    messageBody = document.querySelector('div[aria-label="Message Body"]');
+  }
+
+  fromElement = document.querySelector('[email][name="from"]');
+  toElement = document.querySelector('[email][name="to"]');
+  subjectElement = document.querySelector('[name="subjectbox"]');
+
+  // 3. Handle popup windows (if elements not found)
+  if (!messageBody || !fromElement || !toElement || !subjectElement) {
+    // Adjust selectors for popup windows
+    messageBody = messageBody || document.querySelector('div[aria-label="Message Body"][contenteditable="true"]');
+    fromElement = fromElement || document.querySelector('span[email]'); //span[email]
+    toElement = toElement || document.querySelector('div[aria-label="To"]');
+    subjectElement = subjectElement || document.querySelector('input[name="subject"]');
+  }
 
   return {
     body: messageBody?.textContent || '',
-    from: fromElement?.getAttribute('email') || '',
-    to: toElement?.getAttribute('email') || '',
+    from: fromElement?.getAttribute('email') || fromElement?.textContent || '',
+    to: toElement?.getAttribute('email') || toElement?.textContent || '',
     subject: subjectElement?.value || '',
     timestamp: new Date().toISOString()
   };
@@ -76,50 +97,64 @@ function extractEmailDetails() {
 // Remove the original monitorGmail function and replace with unified monitoring:
 function monitorEmailActivity() {
   let currentEmail = null;
-  
+
   const observer = new MutationObserver(() => {
     try {
-      chrome.storage.local.get('aiEnabled', ({ aiEnabled }) => {
+      chrome.runtime.sendMessage({ action: 'getFromStorage', key: 'aiEnabled' }, (response) => {
+        if (chrome.runtime.lastError) {
+          notificationService.showNotification({ message: `Error getting AI settings: ${chrome.runtime.lastError.message}` });
+          console.error("Error getting AI settings:", chrome.runtime.lastError);
+          return;
+        }
+
+        const aiEnabled = response?.value;
         const messageBody = document.querySelector('div[aria-label="Message Body"]');
-        
+
         // Check if message body is focused
         if (document.activeElement === messageBody) {
           console.log('Email compose area is active');
-          
+
           // Only process if AI is enabled
           if (aiEnabled) {
             const emailDetails = extractEmailDetails();
-            
+
             // Only process if email context has changed
             if (JSON.stringify(emailDetails) !== JSON.stringify(currentEmail)) {
               currentEmail = emailDetails;
-              
-              chrome.runtime.sendMessage({ 
+
+              chrome.runtime.sendMessage({
                 action: 'updateStatusBar',
                 status: 'Extracting email context...'
               });
+              notificationService.showNotification({ message: 'Extracting email context...' });
 
-              chrome.storage.local.set({ currentEmailContext: emailDetails }, () => {
-                chrome.runtime.sendMessage({ 
-                  action: 'processEmailContext',
-                  emailContext: emailDetails 
-                });
+              chrome.runtime.sendMessage({ action: 'setInStorage', key: 'currentEmailContext', value: emailDetails }, (response) => {
+                if (chrome.runtime.lastError) {
+                  notificationService.showNotification({ message: `Error storing email context: ${chrome.runtime.lastError.message}` });
+                  console.error("Error storing email context:", chrome.runtime.lastError);
+                } else {
+                  chrome.runtime.sendMessage({
+                    action: 'processEmailContext',
+                    emailContext: emailDetails
+                  });
+                }
               });
             }
           }
         }
       });
     } catch (error) {
+      notificationService.showNotification({ message: error.message });
       console.error("Error accessing chrome.storage:", error);
     }
   });
 
   // Comprehensive monitoring configuration
-  observer.observe(document.body, { 
-    childList: true, 
-    subtree: true, 
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
     characterData: true,
-    attributes: true 
+    attributes: true
   });
 
   // Monitor focus changes

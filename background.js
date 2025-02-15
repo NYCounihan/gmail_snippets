@@ -1,7 +1,10 @@
+import NotificationService from './services/notificationService.js';
+
 console.log("Background script loaded");
 let snippets = [];
 let aiEnabled = false;
 
+const notificationService = new NotificationService();
 
 //***************************************** */
 //*******GENERAL CRUD LOCAL STORAGE ACTIONS ******** */
@@ -44,22 +47,28 @@ function deleteFromStorage(key, callback) {
 //***************************************** */
 
 
-function checkSnippetsArray (snippets) {
-  // filter out null snippets
-  snippets = snippets.filter(snippet => snippet !== null);
-  // update remaining snippets
-  snippets.forEach((snippet, index) => {
-    snippet.hotkey = index;
-    snippet.content = snippet?.content ?? "";
-    snippet.tags = snippet?.tags ?? [];
-  });
+function checkSnippetsArray(snippets) {
+  // Ensure snippets is an array before attempting to filter
+  if (!Array.isArray(snippets)) {
+    console.warn('Snippets data is not an array. Initializing as an empty array.');
+    snippets = []; // Initialize as an empty array
+  }
+
+  // Ensure each snippet has content and tags initialized
+  if (snippets) {
+    snippets.forEach((snippet) => {
+      snippet.content = snippet.content ?? "";
+      snippet.tags = snippet.tags ?? [];
+    });
+  }
+
   return snippets;
 }
 
 // get snippets from Chrome storage
 function getSnippets(callback) {
   chrome.storage.local.get('snippets', (result) => {
-    snippets = Array.isArray(result.snippets) ? result.snippets : [];
+    snippets = checkSnippetsArray(snippets);
     logSnippetStorage(snippets,"getSnippets");
     callback(snippets);
   });
@@ -71,6 +80,7 @@ function setSnippets(snippets, callback) {
   if (snippets){
     chrome.storage.local.set({snippets}, () => {
       logSnippetStorage(snippets,"setSnippets");
+      notificationService.showNotification({ message: 'Snippets updated successfully!' });
       callback(true);
     });
   }
@@ -82,6 +92,7 @@ function deleteSnippet(index, callback) {
   if (index >= 0 && index < snippets.length) {
     snippets.splice(index, 1); // Remove the specific item at the index
     setSnippets(snippets, (response) => {
+      notificationService.showNotification({ message: 'Snippet deleted successfully!' });
       callback(response);
     });
   } else {
@@ -131,6 +142,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       snippets.push(snippet);
     }
     setSnippets(snippet, (response) => {
+      notificationService.showNotification({ message: 'Snippet added successfully!' });
       sendResponse({ success: response });
     });
     return true;
@@ -173,6 +185,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'deleteFromStorage') {
     deleteFromStorage(request.key, (success) => {
       sendResponse({ success: success });
+    });
+    return true; // Required for asynchronous response
+  }
+
+  if (request.action === 'getEmailContext') {
+    chrome.storage.local.get(['currentEmailSummary', 'currentEmailContext'], (result) => {
+      if (chrome.runtime.lastError) {
+        sendResponse({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        sendResponse({
+          success: true,
+          summary: result.currentEmailSummary || '',
+          context: result.currentEmailContext || {}
+        });
+      }
     });
     return true; // Required for asynchronous response
   }

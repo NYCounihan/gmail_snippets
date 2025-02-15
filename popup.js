@@ -39,10 +39,11 @@ createDeleteButton(snippet, index) - Create delete button
 //==============================================
 // IMPORTS AND GLOBAL STATE
 //==============================================
-import SnippetManager from './snippetManager.js';
+
 import { renderSettingsPage } from './settings.html.js';
 import { mainPageHtml } from './main.html.js';
 import AIHandler from './ai/aiHandler.js';
+import SnippetManager from './services/snippetObject.js';
 
 let activeRow = null;
 const snippetManager = new SnippetManager();
