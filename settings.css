@@ -1,0 +1,88 @@
+/* Settings Container */
+.settings-container {
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Settings Title */
+  .settings-container h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 18px;
+  }
+  
+  /* Add Category Form */
+  #addCategoryForm {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  #addCategoryForm input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  #addCategoryForm button {
+    padding: 8px 16px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  #addCategoryForm button:hover {
+    background-color: #0056b3;
+  }
+  
+  /* Category List */
+  .category-list {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .category-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    background-color: #fff;
+  }
+  
+  .delete-button {
+    padding: 4px 8px;
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .delete-button:hover {
+    background-color: #cc0000;
+  }
+  
+  /* Back to Main Button */
+  #backToMain {
+    display: block;
+    margin: 20px auto;
+    padding: 8px 16px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  #backToMain:hover {
+    background-color: #0056b3;
+  }
