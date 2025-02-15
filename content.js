@@ -1,7 +1,19 @@
-import NotificationService from './services/notificationService.js';
-const notificationService = new NotificationService();
-
 console.log("Content script loaded");
+
+const utils = {
+  sendMessage(action, data) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action, ...data }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(`Error in ${action}:`, chrome.runtime.lastError);
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+};
 
 // Listen for messages from the background script to update snippets or handle snippet insertion
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -10,6 +22,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const snippet = request.snippet;
     const success = insertSnippet(snippet);
     sendResponse({ success });
+
   } else if (request.action === 'checkGmailTab') {
     console.log('Message received in content.js: checkGmailTab');
     monitorEmailActivity(); // Initialize unified monitoring
@@ -20,14 +33,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Function to insert a snippet into the message body
 function insertSnippet(snippet) {
   try {
-    const messageBody = document.activeElement;
-    if (messageBody && messageBody.matches('div[aria-label="Message Body"]')) {
-      insertHTMLAtCursor(messageBody, snippet);
-      return true;
+    // 1. Prioritize the focused element
+    if (document.activeElement && document.activeElement.matches('div[aria-label="Message Body"]')) {
+      messageBody = document.activeElement;
+    } elseif (document.querySelector('div[aria-label="Message Body"]')) {
+      // 2. Look for known selectors in the main document
+      messageBody = document.querySelector('div[aria-label="Message Body"]');
     } else {
-      console.log("Active Element is not a Gmail Message");
+      console.log("contentjs: cannot find Gmail Message");
       return false;
     }
+
+    insertHTMLAtCursor(messageBody, snippet);
+    return true;
   } catch (error) {
     console.error('Error inserting snippet:', error);
   }
@@ -69,7 +87,7 @@ function extractEmailDetails() {
     messageBody = document.activeElement;
   } else {
     // 2. Look for known selectors in the main document
-    messageBody = document.querySelector('div[aria-label="Message Body"]');
+    messageBody = document.querySelector('div[role="textbox"][contenteditable="true"]');
   }
 
   fromElement = document.querySelector('[email][name="from"]');
@@ -100,56 +118,51 @@ function monitorEmailActivity() {
 
   const observer = new MutationObserver(() => {
     try {
-      chrome.runtime.sendMessage({ action: 'getFromStorage', key: 'aiEnabled' }, (response) => {
-        if (chrome.runtime.lastError) {
-          notificationService.showNotification({ message: `Error getting AI settings: ${chrome.runtime.lastError.message}` });
-          console.error("Error getting AI settings:", chrome.runtime.lastError);
-          return;
-        }
+      utils.sendMessage('getFromStorage', { key: 'aiEnabled' })
+        .then(response => {
+          const aiEnabled = response?.value;
+          const messageBody = document.querySelector('div[aria-label="Message Body"]');
 
-        const aiEnabled = response?.value;
-        const messageBody = document.querySelector('div[aria-label="Message Body"]');
+          // Check if message body is focused
+          if (document.activeElement === messageBody) {
+            console.log('Email compose area is active');
 
-        // Check if message body is focused
-        if (document.activeElement === messageBody) {
-          console.log('Email compose area is active');
+            // Only process if AI is enabled
+            if (aiEnabled) {
+              const emailDetails = extractEmailDetails();
 
-          // Only process if AI is enabled
-          if (aiEnabled) {
-            const emailDetails = extractEmailDetails();
+              // Only process if email context has changed
+              if (JSON.stringify(emailDetails) !== JSON.stringify(currentEmail)) {
+                currentEmail = emailDetails;
 
-            // Only process if email context has changed
-            if (JSON.stringify(emailDetails) !== JSON.stringify(currentEmail)) {
-              currentEmail = emailDetails;
+                utils.sendMessage({
+                  action: 'updateStatusBar',
+                  status: 'Extracting email context...'
+                });
 
-              chrome.runtime.sendMessage({
-                action: 'updateStatusBar',
-                status: 'Extracting email context...'
-              });
-              notificationService.showNotification({ message: 'Extracting email context...' });
-
-              chrome.runtime.sendMessage({ action: 'setInStorage', key: 'currentEmailContext', value: emailDetails }, (response) => {
-                if (chrome.runtime.lastError) {
-                  notificationService.showNotification({ message: `Error storing email context: ${chrome.runtime.lastError.message}` });
-                  console.error("Error storing email context:", chrome.runtime.lastError);
-                } else {
-                  chrome.runtime.sendMessage({
-                    action: 'processEmailContext',
-                    emailContext: emailDetails
+                utils.sendMessage('setInStorage', { key: 'currentEmailContext', value: emailDetails })
+                  .then(() => {
+                    utils.sendMessage({
+                      action: 'processEmailContext',
+                      emailContext: emailDetails
+                    });
+                  })
+                  .catch(error => {
+                    console.error("Error storing email context:", error);
                   });
-                }
-              });
+              }
             }
           }
-        }
-      });
+        })
+        .catch(error => {
+          console.error("Error accessing chrome.storage:", error);
+        });
     } catch (error) {
-      notificationService.showNotification({ message: error.message });
       console.error("Error accessing chrome.storage:", error);
     }
   });
 
-  // Comprehensive monitoring configuration
+  // Comprehensive monitoring configuration - removed 'DOMNodeInserted'
   observer.observe(document.body, {
     childList: true,
     subtree: true,

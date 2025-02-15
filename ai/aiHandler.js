@@ -1,4 +1,4 @@
-import NotificationService from '../services/notificationService.js';
+import NotificationService from './services/notificationService.js';
 
 /*
 Future Expansion:
@@ -65,11 +65,8 @@ export default class AIHandler {
   }
 
   async processEmailContext(emailContext) {
-    this.showLoading();
-    notificationService.showNotification({ message: 'AI analyzing email context...' });
-    chrome.runtime.sendMessage({ 
-      action: 'updateStatusBar',
-      status: 'AI analyzing email context...'
+    notificationService.showNotification({ 
+      message: 'AI analyzing email context...'
     });
 
     try {
@@ -79,41 +76,18 @@ export default class AIHandler {
         lastProcessedEmail: emailContext.timestamp
       });
 
-      chrome.runtime.sendMessage({ 
-        action: 'updateStatusBar',
-        status: 'Email context analyzed and ready'
+      notificationService.showNotification({ 
+        message: 'Email context analyzed and ready'
       });
-      notificationService.showNotification({ message: 'Email context analyzed and ready' });
     } catch (error) {
       console.error('Failed to process email context:', error);
-      chrome.runtime.sendMessage({ 
-        action: 'updateStatusBar',
-        status: 'Failed to analyze email context'
+      notificationService.showNotification({ 
+        message: 'Failed to analyze email context'
       });
-      notificationService.showNotification({ message: 'Failed to analyze email context' });
-    } finally {
-      this.hideLoading();
-    }
-  }
-
-  showLoading() {
-    if (!this.loadingIndicator) {
-      this.loadingIndicator = document.createElement('div');
-      this.loadingIndicator.className = 'ai-loading';
-      this.loadingIndicator.textContent = 'AI Processing...';
-      document.body.appendChild(this.loadingIndicator);
-    }
-  }
-
-  hideLoading() {
-    if (this.loadingIndicator) {
-      this.loadingIndicator.remove();
-      this.loadingIndicator = null;
-    }
+    } 
   }
 
   async processWithAI(snippet, emailData) {
-    console.log('Processing snippet with AI:', emailData.summary);
     try {
       if (!this.session) {
         await this.initializeSession();
@@ -145,12 +119,10 @@ export default class AIHandler {
   }
 
   async processSnippet(snippet, emailContext) {
-    this.showLoading();
-    notificationService.showNotification({ message: 'Processing snippet with AI...' });
+    notificationService.showNotification({message: 'AI Processing...'});
     
     return new Promise((resolve) => {
       const timeoutId = setTimeout(() => {
-        this.hideLoading();
         resolve({ modified: false, content: snippet });
       }, this.timeout);
 
@@ -158,14 +130,10 @@ export default class AIHandler {
       this.processWithAI(snippet, emailContext)
         .then(response => {
           clearTimeout(timeoutId);
-          this.hideLoading();
-          notificationService.showNotification({ message: 'Snippet processing complete.' });
           resolve(response);
         })
         .catch(() => {
           clearTimeout(timeoutId);
-          this.hideLoading();
-          notificationService.showNotification({ message: 'Snippet processing failed.' });
           resolve({ modified: false, content: snippet });
         });
     });
@@ -173,19 +141,14 @@ export default class AIHandler {
 
   async extractEmailContext() {
     try {
-      // Use sendMessage to get data from background script
-      chrome.runtime.sendMessage({ action: 'getEmailContext' }, (response) => {
-
-        if (!response || !response.success || !response.summary) {
-          console.error('No email summary available');
-          return { summary: '', context: {} };
-        }
-
-        return {
-          summary: response.summary,
-          context: response.context
-        };
-      });
+      const result = await chrome.storage.local.get(['currentEmailSummary', 'currentEmailContext']);
+      if (!result.currentEmailSummary) {
+        throw new Error('No email summary available');
+      }
+      return {
+        summary: result.currentEmailSummary,
+        context: result.currentEmailContext
+      };
     } catch (error) {
       console.error('Failed to get email context:', error);
       return { summary: '', context: {} };

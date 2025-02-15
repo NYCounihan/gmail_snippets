@@ -1,10 +1,12 @@
 import NotificationService from './services/notificationService.js';
+import AIHandler from './ai/aiHandler.js';
 
 console.log("Background script loaded");
 let snippets = [];
 let aiEnabled = false;
 
 const notificationService = new NotificationService();
+const aiHandler = new AIHandler(); // Instantiate AIHandler in background
 
 //***************************************** */
 //*******GENERAL CRUD LOCAL STORAGE ACTIONS ******** */
@@ -189,19 +191,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Required for asynchronous response
   }
 
-  if (request.action === 'getEmailContext') {
-    chrome.storage.local.get(['currentEmailSummary', 'currentEmailContext'], (result) => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-      } else {
-        sendResponse({
-          success: true,
-          summary: result.currentEmailSummary || '',
-          context: result.currentEmailContext || {}
-        });
-      }
-    });
-    return true; // Required for asynchronous response
+  // Handle AI processing requests
+  if (request.action === 'processEmailContext') {
+    aiHandler.processEmailContext(request.emailContext);
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (request.action === 'extractEmailContext') {
+    aiHandler.extractEmailContext()
+      .then(context => sendResponse({ success: true, ...context }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
   }
 
   return false;
@@ -215,6 +216,28 @@ chrome.runtime.onInstalled.addListener(() => {
     categories: ['General'] // Initialize with a default category
   });*/
   console.log('Extension and AI features initialized');
+});
+
+chrome.windows.onFocusChanged.addListener(windowId => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    // No window is focused (e.g., all windows are minimized)
+    setInStorage('isPopupActive', false, () => {
+      console.log('Popup is not active (no window focused)');
+    });
+  } else {
+    chrome.windows.get(windowId, window => {
+      // Check if the focused window is a popup
+      if (window.type === 'popup') {
+        setInStorage('isPopupActive', true, () => {
+          console.log('Popup is active (popup window focused)');
+        });
+      } else {
+        setInStorage('isPopupActive', false, () => {
+          console.log('Popup is not active (non-popup window focused)');
+        });
+      }
+    });
+  }
 });
 
 function onBackgroundLoad() {

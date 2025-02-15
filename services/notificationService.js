@@ -17,27 +17,40 @@ export default class NotificationService {
 
     async processQueue() {
         while (this.queue.length > 0) {
-            this.isPopupActive = true;
-            const notification = this.queue.shift();
             try {
+                const notification = this.queue.shift();
                 await this.displayNotification(notification);
                 await this.delay(3000); // Timeout between notifications
             } catch (error) {
                 console.error('Error displaying notification:', error);
             }
         }
-        this.isPopupActive = false;
     }
 
     async displayNotification(notification) {
-        if (this.isPopupActive) {
-            // Send message to popup to update status bar
-            chrome.runtime.sendMessage({ action: 'updateStatusBar', status: notification.message });
+      try {
+        const result = await new Promise((resolve, reject) => {
+          chrome.storage.local.get('isPopupActive', (result) => {
+            if (chrome.runtime.lastError) {
+              reject(chrome.runtime.lastError);
+            } else {
+              resolve(result.isPopupActive || false);
+            }
+          });
+        });
+  
+        if (result) {
+          // Send message to popup to update status bar
+          chrome.runtime.sendMessage({ action: 'updateStatusBar', status: notification.message });
         } else {
-            // Show a subtle notification popup
-            this.showSubtleNotification(notification.message);
+          // Show a subtle notification popup
+          this.showSubtleNotification(notification.message);
         }
-        return new Promise(resolve => setTimeout(resolve, 2000)); // Simulate display time
+      } catch (error) {
+        console.error("Error checking popup state:", error);
+        this.showSubtleNotification(notification.message); // Fallback in case of error
+      }
+      return new Promise(resolve => setTimeout(resolve, 2000)); // Simulate display time
     }
 
     showSubtleNotification(message) {

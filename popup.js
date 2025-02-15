@@ -42,12 +42,10 @@ createDeleteButton(snippet, index) - Create delete button
 
 import { renderSettingsPage } from './settings.html.js';
 import { mainPageHtml } from './main.html.js';
-import AIHandler from './ai/aiHandler.js';
 import SnippetManager from './services/snippetObject.js';
 
 let activeRow = null;
 const snippetManager = new SnippetManager();
-const aiHandler = new AIHandler();
 
 //==============================================
 // UTILITY FUNCTIONS
@@ -56,6 +54,18 @@ const utils = {
   handleError(error, message) {
     console.error(message, error);
     alert(`${message}. Please try again.`);
+  },
+  sendMessage(action, data) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action, ...data }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error(`Error in ${action}:`, chrome.runtime.lastError);
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve(response);
+        }
+      });
+    });
   }
 };
 
@@ -116,13 +126,16 @@ function createInsertButton(snippet) {
     
     if (aiEnabled?.aiEnabled) {
       try {
-        const emailData = await aiHandler.extractEmailContext();
-        if (emailData.summary) {
-          const { modified, content } = await aiHandler.processSnippet(snippet.content, emailData);
-          
-          if (modified) {
+        // Send message to background script to extract email context
+        const response = await utils.sendMessage('extractEmailContext');
+
+        if (response && response.summary) {
+          // Send message to background script to process snippet
+          const aiResponse = await utils.sendMessage('processSnippet', { snippet: snippet.content, emailData: response });
+
+          if (aiResponse && aiResponse.modified) {
             if (confirm('AI has modified the snippet based on email context. Use modified version?')) {
-              snippet.content = content;
+              snippet.content = aiResponse.content;
             }
           }
         } else {
@@ -139,7 +152,6 @@ function createInsertButton(snippet) {
         chrome.tabs.sendMessage(tabs[0].id, { action: 'insertSnippet', snippet: snippet.content }, (response) => {
           if (chrome.runtime.lastError || !response || !response.success) {
             console.error('Failed to insert snippet:', chrome.runtime.lastError);
-            alert('Failed to insert snippet. Please ensure you have an open Gmail draft.');
           } else {
             console.log('Snippet inserted successfully');
           }
