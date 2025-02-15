@@ -188,9 +188,6 @@ td {
   flex-wrap: wrap;
   gap: 5px; /* Space between tags */
   padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background-color: #f9f9f9;
 }
 
 /* Style for individual tags */
@@ -259,3 +256,66 @@ td {
   transform: translateY(-1px);
   box-shadow: 0 2px 3px rgba(0,0,0,0.1);
 }
+
+/* AI Toggle */
+.ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px;
+  font-size: 12px;
+}
+
+.ai-toggle input[type="checkbox"] {
+  margin: 0;
+}
+
+/* AI Loading */
+.ai-loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 4px;
+  z-index: 1000;
+}
+
+.settings-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.settings-section h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+.ai-description {
+  margin-top: 5px;
+  color: #666;
+  font-size: 11px;
+  font-style: italic;
+}
+
+#statusBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px;
+  background-color: #f8f9fa;
+  border-top: 1px solid #dee2e6;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  display: none;
+}
+
+

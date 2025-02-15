@@ -9,32 +9,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success });
   } else if (request.action === 'checkGmailTab') {
     console.log('Message received in content.js: checkGmailTab');
-    monitorGmail(); // Start monitoring Gmail if it's a Gmail tab
+    monitorEmailActivity(); // Initialize unified monitoring
   }
   return true; // Required to indicate asynchronous response
 });
-
-// Function to monitor Gmail for new message divs
-function monitorGmail() {
-  const observer = new MutationObserver(() => {
-    checkActiveElement();
-  });
-
-  // Observe changes in the document body
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Function to check if the active element is the target div
-  function checkActiveElement() {
-    const activeElement = document.activeElement;
-    if (activeElement && activeElement.matches('div[aria-label="Message Body"]')) {
-      console.log('monitorGmail function: active element is the new message div');
-    }
-  }
-
-  // Add event listeners for focus and blur events to monitor active element changes
-  document.addEventListener('focus', checkActiveElement, true);
-  document.addEventListener('blur', checkActiveElement, true);
-}
 
 // Function to insert a snippet into the message body
 function insertSnippet(snippet) {
@@ -79,3 +57,75 @@ function insertHTMLAtCursor(element, html) {
     selection.addRange(range);
   }
 }
+
+function extractEmailDetails() {
+  const messageBody = document.querySelector('div[aria-label="Message Body"]');
+  const fromElement = document.querySelector('[email][name="from"]');
+  const toElement = document.querySelector('[email][name="to"]');
+  const subjectElement = document.querySelector('[name="subjectbox"]');
+
+  return {
+    body: messageBody?.textContent || '',
+    from: fromElement?.getAttribute('email') || '',
+    to: toElement?.getAttribute('email') || '',
+    subject: subjectElement?.value || '',
+    timestamp: new Date().toISOString()
+  };
+}
+
+// Remove the original monitorGmail function and replace with unified monitoring:
+function monitorEmailActivity() {
+  let currentEmail = null;
+  
+  const observer = new MutationObserver(() => {
+    try {
+      chrome.storage.local.get('aiEnabled', ({ aiEnabled }) => {
+        const messageBody = document.querySelector('div[aria-label="Message Body"]');
+        
+        // Check if message body is focused
+        if (document.activeElement === messageBody) {
+          console.log('Email compose area is active');
+          
+          // Only process if AI is enabled
+          if (aiEnabled) {
+            const emailDetails = extractEmailDetails();
+            
+            // Only process if email context has changed
+            if (JSON.stringify(emailDetails) !== JSON.stringify(currentEmail)) {
+              currentEmail = emailDetails;
+              
+              chrome.runtime.sendMessage({ 
+                action: 'updateStatusBar',
+                status: 'Extracting email context...'
+              });
+
+              chrome.storage.local.set({ currentEmailContext: emailDetails }, () => {
+                chrome.runtime.sendMessage({ 
+                  action: 'processEmailContext',
+                  emailContext: emailDetails 
+                });
+              });
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error accessing chrome.storage:", error);
+    }
+  });
+
+  // Comprehensive monitoring configuration
+  observer.observe(document.body, { 
+    childList: true, 
+    subtree: true, 
+    characterData: true,
+    attributes: true 
+  });
+
+  // Monitor focus changes
+  document.addEventListener('focus', () => observer.takeRecords(), true);
+  document.addEventListener('blur', () => observer.takeRecords(), true);
+}
+
+// Initialize monitoring
+monitorEmailActivity();

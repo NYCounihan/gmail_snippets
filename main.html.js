@@ -1,4 +1,4 @@
-const mainPageHtml = `
+export const mainPageHtml = `
   <h1>Snippet Inserter</h1>
   <div class="button-container">
     <button id="fetchSnippets">Fetch Snippets</button>
