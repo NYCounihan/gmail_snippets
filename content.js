@@ -78,6 +78,8 @@ function extractEmailDetails() {
     }
   }
 
+  chrome.runtime.sendMessage({ action: 'notification', message: 'Email extracted: ' + subjectElement ? subjectElement.innerText.trim() : '' });
+
   return {
     body: messageEl ? messageEl.innerText : '',
     html: messageEl ? messageEl.innerHTML : '',
@@ -134,7 +136,9 @@ function monitorEmailActivity() {
 }
 
 /* ===== Existing Subtle Notification ===== */
-function showSubtleNotification(message) {
+function showSubtleNotification(status) {
+  const message = typeof status === 'object' ? JSON.stringify(status) : status;
+
   const notificationDiv = document.createElement('div');
   notificationDiv.classList.add('subtle-notification');
   notificationDiv.textContent = message;
@@ -213,7 +217,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   } else if (request.action === 'showSubtleNotification') {
     console.log('Message received in content.js: subtleNotification');
-    showSubtleNotification(request.message);
+    showSubtleNotification(request.status.message);
+    sendResponse({ success: true });
   }
 
   return true; // Required to indicate asynchronous response

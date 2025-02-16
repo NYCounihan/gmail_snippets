@@ -13,6 +13,7 @@ async function initializeAIHandler() {
     aiHandler = new AIHandler();
     await aiHandler.initializeSession();
     console.log('background.js: AI initialized');
+    notificationService.showNotification({ message: 'AI Initialized' });
   } catch (error) {
     console.error('Error instantiating AIHandler', error);
   }
@@ -206,6 +207,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'processEmailContext') {
     if (aiHandler){
       aiHandler.processEmailContext(request.rawEmail);
+      notificationService.showNotification({ message: 'Email Summary Initiated' });
       sendResponse({ success: true });
       return true;
     } else {
@@ -226,7 +228,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle AI process snippet requests
   if (request.action === 'AIprocessSnippet') {
     if (aiHandler) {
+      notificationService.showNotification({ message: 'Snippet AI-Update Initiated' });
       aiHandler.processSnippet(request.snippet, request.emailSummary, (response) => {
+        notificationService.showNotification({ message: 'Snippet AI-Update Complete' });
         sendResponse(response);
       });
       return true; // Required for asynchronous response
@@ -237,33 +241,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Handle AI process snippet requests
-  if (request.action === 'notificaiton') {
+  if (request.action === 'notification') {
     notificationService.showNotification({message: request});
     return true;
   }
 
-});
-
-chrome.windows.onFocusChanged.addListener(windowId => {
-  if (windowId === chrome.windows.WINDOW_ID_NONE) {
-    // No window is focused (e.g., all windows are minimized)
-    setInStorage('isPopupActive', false, () => {
-      console.log('Popup is not active (no window focused)');
-    });
-  } else {
-    chrome.windows.get(windowId, window => {
-      // Check if the focused window is a popup
-      if (window.type === 'popup') {
-        setInStorage('isPopupActive', true, () => {
-          console.log('Popup is active (popup window focused)');
-        });
-      } else {
-        setInStorage('isPopupActive', false, () => {
-          console.log('Popup is not active (non-popup window focused)');
-        });
-      }
-    });
-  }
 });
 
 function onBackgroundLoad() {

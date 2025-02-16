@@ -33,12 +33,11 @@ export default class AIHandler {
       topK: capabilities.defaultTopK
     });
 
-    console.log('aiHandler: class intialized');
+    console.log('aiHandler: class initialized');
     console.log(await this.session.prompt("say hello in a random fashion"));
   }
 
   async summarizeEmailContext(rawEmail) {
-
     try {
       if (!this.session) {
         await this.initializeSession();
@@ -87,6 +86,9 @@ export default class AIHandler {
       controller.abort(); // Abort any previous requests
       controller = new AbortController();
 
+      
+      chrome.runtime.sendMessage({ action: 'notification', message: 'AI creating email summary...' });
+
       // Prompt the model and stream the result:
       const stream = this.session.promptStreaming(prompt, { signal: controller.signal });
       for await (const chunk of stream) {
@@ -99,10 +101,16 @@ export default class AIHandler {
       console.log(summary);
 
       console.log('aihandler.js: complete email summary created from AI ' + summary);
+      chrome.runtime.sendMessage({ action: 'notification', message: 'AI succesfully summarized email' });
+
+      // Send notification message to background.js
+      chrome.runtime.sendMessage({ action: 'notification', message: 'Email context summarized' });
+
       return summary.trim();
 
     } catch (error) {
-      console.error('aihandler.js: Failed or aborted emaily summary:', error);
+      chrome.runtime.sendMessage({ action: 'notification', message: 'AI unable to summarize email ' + error.message});
+      console.error('aihandler.js: Failed or aborted email summary:' + error.name + ': ' + error.message);
       return summary.trim();
     }
   }
@@ -138,7 +146,7 @@ export default class AIHandler {
       const prompt = `
       Original Snippet: ${snippet}  
       Email Summary: ${emailSummary}
-        Task: Update the original snippet to craft an email repsonse that maintains the original underlying intent and message of the snippet.
+        Task: Update the original snippet to craft an email response that maintains the original underlying intent and message of the snippet.
               Make as few changes as possible. Do not invent any new information. Only modify the Original Snippet as little as necessary.
               Do not include any other text in your response other than the email reply addressed to the person who sent the last email.
               Your response will be directly inserted into the email. Be sure to address the email to the person who wrote the last email message.
@@ -153,16 +161,20 @@ export default class AIHandler {
 
       console.log('Updating snippet using AI and emailSummary:', prompt);
 
+      chrome.runtime.sendMessage({ action: 'notification', message: 'AI updating snippet...' });
       const result = await this.session.prompt(prompt);
       console.log('aiHandler: modified snippet from AI ' + result.trim());  
-      
+
+      chrome.runtime.sendMessage({ action: 'notification', message: 'Snippet succesfully modified by AI' });
+
       return {
         modified: true,
         content: result.trim()
       };
 
     } catch (error) {
-      console.error('Language model processing error:', error);
+      chrome.runtime.sendMessage({ action: 'notification', message: 'Error updating snippet with AI' });
+      console.error('aihandler.js: AI error updating snippet : ' + error.name + ': ' + error.message);
       return { modified: false, content: snippet };
     }
   }

@@ -519,15 +519,29 @@ window.addEventListener('blur', () => {
 function updateStatusBar(status) {
   const statusBar = document.getElementById('statusBar');
   if (statusBar) {
-    statusBar.textContent = status;
-    statusBar.style.display = status ? 'block' : 'none';
+    const message = typeof status === 'object' ? JSON.stringify(status) : status;
+    statusBar.textContent = message;
+    statusBar.style.display = message ? 'block' : 'none';
+
+    if (message) {
+      setTimeout(() => {
+        statusBar.style.transition = 'opacity 2s';
+        statusBar.style.opacity = '0';
+        setTimeout(() => {
+          statusBar.style.display = 'none';
+          statusBar.style.opacity = '1'; // Reset opacity for future use
+        }, 2000);
+      }, 4000);
+    }
   }
 }
 
 // Add to the existing message listener
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'updateStatusBar') {
+    console.log('popup.js: Message received updateStatusBar + ' + request.status.message);
     updateStatusBar(request.status);
+    sendResponse({ success: true });
   }
 });
 
