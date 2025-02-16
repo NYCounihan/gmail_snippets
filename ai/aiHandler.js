@@ -1,5 +1,3 @@
-import NotificationService from './services/notificationService.js';
-
 /*
 Future Expansion:
 - Add multiple model support via aiConfig.json
@@ -9,45 +7,69 @@ Future Expansion:
 */
 
 const DEFAULT_TIMEOUT = 10000;
-const DEFAULT_TEMPERATURE = 0.7;
-const DEFAULT_TOP_K = 40;
-
-const notificationService = new NotificationService();
+let controller = new AbortController();
+//const DEFAULT_TEMPERATURE = 0.7;
+//const DEFAULT_TOP_K = 40;
 
 export default class AIHandler {
   constructor() {
     this.timeout = DEFAULT_TIMEOUT;
     this.loadingIndicator = null;
     this.session = null;
+    this.aiNamespace = self.ai || chrome.aiOriginTrial || chrome.ai;
   }
 
   async initializeSession() {
     // Check if language model is available
-    const capabilities = await self.ai.languageModel.capabilities();
+    const capabilities = await this.aiNamespace.languageModel.capabilities();
     if (capabilities.available === "no") {
       throw new Error('Language model not available on this device');
     }
 
     // Create session with default parameters
-    this.session = await self.ai.languageModel.create({
+    this.session = await this.aiNamespace.languageModel.create({
       systemPrompt: "You are a helpful assistant that improves email snippets to be more professional and context-appropriate.",
       temperature: capabilities.defaultTemperature,
       topK: capabilities.defaultTopK
     });
+
+    console.log('aiHandler: class intialized');
+    console.log(await this.session.prompt("say hello in a random fashion"));
   }
 
-  async summarizeEmailContext(emailContext) {
+  async summarizeEmailContext(rawEmail) {
+
     try {
       if (!this.session) {
         await this.initializeSession();
+        console.log('aiHandler.js: session re-initialized');
+      }
+
+      console.log('aiHandler.js '+`${this.session.tokensSoFar}/${this.session.maxTokens} (${this.session.tokensLeft} left)`);
+
+      const from = rawEmail.from ?? "";
+      const to = rawEmail.to ?? "";
+      const subject = rawEmail.subject ?? "";
+      let body = rawEmail.body ?? "";
+
+      // Check if all values are empty
+      if (!from && !to && !subject && !body) {
+        console.log('aihandler.js: All rawEmail values are empty. Skipping prompt.');
+        return 'No email content to summarize';
+      }
+
+      // Limit the body (e.g., 500 characters)
+      const maxLength = 1500;
+      if (body.length > maxLength) {
+        body = body.substring(0, maxLength) + '...';
       }
 
       const prompt = `
         Please summarize the following email context:
-        From: ${emailContext.from}
-        To: ${emailContext.to}
-        Subject: ${emailContext.subject}
-        Body: ${emailContext.body}
+        From: ${from}
+        To: ${to}
+        Subject: ${subject}
+        Body: ${body}
 
         Provide a brief summary that captures:
         1. The main topic
@@ -56,46 +78,65 @@ export default class AIHandler {
         4. Any specific context that might be relevant
       `;
 
-      const summary = await this.session.prompt(prompt);
+      console.log('aihandler.js: this is the prompt ' + prompt);
+
+      let summary = '';
+      let previousChunk = '';
+
+      controller.abort(); // Abort any previous requests
+      controller = new AbortController();
+
+      // Prompt the model and stream the result:
+      const stream = this.session.promptStreaming(prompt, { signal: controller.signal });
+      for await (const chunk of stream) {
+        const newChunk = chunk.startsWith(previousChunk)
+            ? chunk.slice(previousChunk.length) : chunk;
+        console.log(newChunk);
+        summary += newChunk;
+        previousChunk = chunk;
+      }
+      console.log(summary);
+
+      console.log('aihandler.js: complete email summary created from AI ' + summary);
       return summary.trim();
+
     } catch (error) {
-      console.error('Failed to summarize email:', error);
-      return 'Failed to generate summary';
+      console.error('aihandler.js: Failed or aborted emaily summary:', error);
+      return summary.trim();
     }
   }
 
-  async processEmailContext(emailContext) {
-    notificationService.showNotification({ 
-      message: 'AI analyzing email context...'
-    });
-
+  async processEmailContext(rawEmail) {
     try {
-      const summary = await this.summarizeEmailContext(emailContext);
-      await chrome.storage.local.set({ 
-        currentEmailSummary: summary,
-        lastProcessedEmail: emailContext.timestamp
-      });
-
-      notificationService.showNotification({ 
-        message: 'Email context analyzed and ready'
-      });
+      const summary = await this.summarizeEmailContext(rawEmail);
+      chrome.storage.local.set({ currentEmailSummary: summary, lastProcessedEmail: rawEmail.timestamp});
     } catch (error) {
-      console.error('Failed to process email context:', error);
-      notificationService.showNotification({ 
-        message: 'Failed to analyze email context'
-      });
+      console.log(error.message);
     } 
   }
 
-  async processWithAI(snippet, emailData) {
+  processSnippet(snippet, emailSummary, callback) {
+    console.log('aiHandler: processSnippet sent' + snippet + ' // ' + emailSummary);
+
+    // Process directly instead of sending message
+    this.modifySnippetAI(snippet, emailSummary)
+      .then(response => {
+        callback(response);
+      })
+      .catch(() => {
+        callback({ modified: false, content: snippet });
+    });
+  }
+
+  async modifySnippetAI(snippet, emailSummary) {
     try {
       if (!this.session) {
         await this.initializeSession();
       }
 
       const prompt = `
-        Email Summary: ${emailData.summary}
-        Original Snippet: ${snippet}
+      Original Snippet: ${snippet}  
+      Email Summary: ${emailSummary}
         Task: Modify this snippet to better fit the email context while maintaining the original intent.
         Requirements:
         - Keep professional tone
@@ -104,8 +145,10 @@ export default class AIHandler {
         - Preserve any formatting
       `;
 
-      console.log('Processing with AI using context:', prompt);
+      console.log('Updating snippet using AI and emailSummary:', prompt);
+
       const result = await this.session.prompt(prompt);
+      console.log('aiHandler: modified snippet from AI ' + result.trim());  
       
       return {
         modified: true,
@@ -118,40 +161,4 @@ export default class AIHandler {
     }
   }
 
-  async processSnippet(snippet, emailContext) {
-    notificationService.showNotification({message: 'AI Processing...'});
-    
-    return new Promise((resolve) => {
-      const timeoutId = setTimeout(() => {
-        resolve({ modified: false, content: snippet });
-      }, this.timeout);
-
-      // Process directly instead of sending message
-      this.processWithAI(snippet, emailContext)
-        .then(response => {
-          clearTimeout(timeoutId);
-          resolve(response);
-        })
-        .catch(() => {
-          clearTimeout(timeoutId);
-          resolve({ modified: false, content: snippet });
-        });
-    });
-  }
-
-  async extractEmailContext() {
-    try {
-      const result = await chrome.storage.local.get(['currentEmailSummary', 'currentEmailContext']);
-      if (!result.currentEmailSummary) {
-        throw new Error('No email summary available');
-      }
-      return {
-        summary: result.currentEmailSummary,
-        context: result.currentEmailContext
-      };
-    } catch (error) {
-      console.error('Failed to get email context:', error);
-      return { summary: '', context: {} };
-    }
-  }
-}
+} // end of class AIHandler

@@ -29,56 +29,34 @@ export default class NotificationService {
 
     async displayNotification(notification) {
       try {
-        const result = await new Promise((resolve, reject) => {
-          chrome.storage.local.get('isPopupActive', (result) => {
-            if (chrome.runtime.lastError) {
-              reject(chrome.runtime.lastError);
-            } else {
-              resolve(result.isPopupActive || false);
-            }
+          const result = await new Promise((resolve, reject) => {
+              chrome.storage.local.get('isPopupActive', (result) => {
+                  if (chrome.runtime.lastError) {
+                      reject(chrome.runtime.lastError);
+                  } else {
+                      resolve(result.isPopupActive || false);
+                  }
+              });
           });
-        });
-  
-        if (result) {
-          // Send message to popup to update status bar
-          chrome.runtime.sendMessage({ action: 'updateStatusBar', status: notification.message });
-        } else {
-          // Show a subtle notification popup
-          this.showSubtleNotification(notification.message);
-        }
+
+          if (result) {
+              // Send message to popup to update status bar
+              chrome.runtime.sendMessage({ action: 'updateStatusBar', status: notification.message });
+          } else {
+              // Send message to content script to show a subtle notification
+              chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                  if (tabs.length > 0) {
+                      chrome.tabs.sendMessage(tabs[0].id, { action: 'showSubtleNotification', message: notification.message });
+                  }
+              });
+          }
       } catch (error) {
-        console.error("Error checking popup state:", error);
-        this.showSubtleNotification(notification.message); // Fallback in case of error
+          console.error("Error checking popup state:", error);
       }
       return new Promise(resolve => setTimeout(resolve, 2000)); // Simulate display time
-    }
+  }
 
-    showSubtleNotification(message) {
-        const notificationDiv = document.createElement('div');
-        notificationDiv.classList.add('subtle-notification');
-        notificationDiv.textContent = message;
-
-        // Style the notification
-        notificationDiv.style.position = 'fixed';
-        notificationDiv.style.top = '10px';
-        notificationDiv.style.right = '10px';
-        notificationDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        notificationDiv.style.color = 'white';
-        notificationDiv.style.padding = '10px';
-        notificationDiv.style.borderRadius = '5px';
-        notificationDiv.style.zIndex = '10000';
-        notificationDiv.style.display = 'block';
-
-        document.body.appendChild(notificationDiv);
-
-        // Remove the notification after 4 seconds
-        setTimeout(() => {
-            notificationDiv.style.display = 'none';
-            notificationDiv.remove();
-        }, 4000);
-    }
-
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
+  delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+  }
 }

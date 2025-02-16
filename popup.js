@@ -65,8 +65,8 @@ const utils = {
           resolve(response);
         }
       });
-    });
-  }
+});
+      }
 };
 
 function createFormattingButton(innerHTML, title, command, promptText = null) {
@@ -122,27 +122,36 @@ function createInsertButton(snippet) {
   };
 
   insertButton.addEventListener('click', async () => {
-    const aiEnabled = await chrome.storage.local.get('aiEnabled');
-    
-    if (aiEnabled?.aiEnabled) {
+    const { aiEnabled } = await chrome.storage.local.get('aiEnabled');
+    let emailSummary = '';
+    let aiSnippet = '';
+
+    // tailor snippet to email context using AI
+    if (aiEnabled) {
       try {
         // Send message to background script to extract email context
-        const response = await utils.sendMessage('extractEmailContext');
+        chrome.runtime.sendMessage({ action: 'extractEmailContext' }, (response) => {
+          emailSummary = response;
+          console.log('extractEmailContext response:', emailSummary);
 
-        if (response && response.summary) {
-          // Send message to background script to process snippet
-          const aiResponse = await utils.sendMessage('processSnippet', { snippet: snippet.content, emailData: response });
+          if (emailSummary && emailSummary.summary) {
+            // Send message to background script to process snippet
+            chrome.runtime.sendMessage({ action: 'AIprocessSnippet', snippet: snippet.content, emailSummary: emailSummary.summary }, (response) => {
+              aiSnippet = response;
+              console.log('AIprocessSnippet response:', aiSnippet);
 
-          if (aiResponse && aiResponse.modified) {
-            if (confirm('AI has modified the snippet based on email context. Use modified version?')) {
-              snippet.content = aiResponse.content;
-            }
+              if (aiSnippet && aiSnippet.modified) {
+                if (confirm('AI has modified the snippet based on email context. Use modified version?')) {
+                  snippet.content = aiSnippet.content;
+                }
+              }
+            });
+          } else {
+            console.warn('No email context available for AI processing');
           }
-        } else {
-          console.warn('No email context available for AI processing');
-        }
+        });
       } catch (error) {
-        console.error('AI processing failed:', error);
+        console.error('Failed to update snippet with AI:', error);
         // Continue with original snippet
       }
     }
@@ -508,7 +517,6 @@ function updateStatusBar(status) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'updateStatusBar') {
     updateStatusBar(request.status);
-  } else if (request.action === 'processEmailContext') {
-    aiHandler.processEmailContext(request.emailContext);
   }
 });
+

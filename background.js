@@ -4,9 +4,21 @@ import AIHandler from './ai/aiHandler.js';
 console.log("Background script loaded");
 let snippets = [];
 let aiEnabled = false;
-
+let aiHandler;
 const notificationService = new NotificationService();
-const aiHandler = new AIHandler(); // Instantiate AIHandler in background
+
+
+async function initializeAIHandler() {
+  try {
+    aiHandler = new AIHandler();
+    await aiHandler.initializeSession();
+    console.log('background.js: AI initialized');
+  } catch (error) {
+    console.error('Error instantiating AIHandler', error);
+  }
+}
+
+initializeAIHandler();
 
 //***************************************** */
 //*******GENERAL CRUD LOCAL STORAGE ACTIONS ******** */
@@ -48,7 +60,6 @@ function deleteFromStorage(key, callback) {
 //*******SNIIPPETS ACTIONS******** */
 //***************************************** */
 
-
 function checkSnippetsArray(snippets) {
   // Ensure snippets is an array before attempting to filter
   if (!Array.isArray(snippets)) {
@@ -70,8 +81,8 @@ function checkSnippetsArray(snippets) {
 // get snippets from Chrome storage
 function getSnippets(callback) {
   chrome.storage.local.get('snippets', (result) => {
-    snippets = checkSnippetsArray(snippets);
-    logSnippetStorage(snippets,"getSnippets");
+    snippets = checkSnippetsArray(result.snippets);
+    logSnippetStorage(snippets, "getSnippets");
     callback(snippets);
   });
 }
@@ -79,9 +90,9 @@ function getSnippets(callback) {
 // set snippets from Chrome storage
 function setSnippets(snippets, callback) {
   snippets = checkSnippetsArray(snippets);
-  if (snippets){
-    chrome.storage.local.set({snippets}, () => {
-      logSnippetStorage(snippets,"setSnippets");
+  if (snippets) {
+    chrome.storage.local.set({ snippets }, () => {
+      logSnippetStorage(snippets, "setSnippets");
       notificationService.showNotification({ message: 'Snippets updated successfully!' });
       callback(true);
     });
@@ -103,7 +114,7 @@ function deleteSnippet(index, callback) {
   }
 }
 
-function logSnippetStorage(snippets,caller) {
+function logSnippetStorage(snippets, caller) {
   console.log(caller + " start data action");
   console.log("******************************************");
   if (snippets) {
@@ -129,7 +140,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'updateSnippet') {
-    const {index, snippet } = request;
+    const { index, snippet } = request;
     snippets[index] = snippet;
 
     setSnippets(snippets, (response) => {
@@ -139,11 +150,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'addSnippet') {
-    const {snippet} = request;
-    if (!snippet){
+    const { snippet } = request;
+    if (snippet) {
       snippets.push(snippet);
     }
-    setSnippets(snippet, (response) => {
+    setSnippets(snippets, (response) => {
       notificationService.showNotification({ message: 'Snippet added successfully!' });
       sendResponse({ success: response });
     });
@@ -193,29 +204,44 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Handle AI processing requests
   if (request.action === 'processEmailContext') {
-    aiHandler.processEmailContext(request.emailContext);
-    sendResponse({ success: true });
-    return true;
+    if (aiHandler){
+      aiHandler.processEmailContext(request.rawEmail);
+      sendResponse({ success: true });
+      return true;
+    } else {
+      sendResponse({ success: false });
+      return false;
+    }
   }
 
   if (request.action === 'extractEmailContext') {
-    aiHandler.extractEmailContext()
-      .then(context => sendResponse({ success: true, ...context }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
+    chrome.storage.local.get(['currentEmailSummary', 'currentRawEmail'], (result) => {
+      let currentEmailSummary = result.currentEmailSummary || '';
+      let currentRawEmail = result.currentRawEmail || '';
+      sendResponse({ summary: currentEmailSummary, rawEmail: currentRawEmail });
+    });
+    return true; // Required for asynchronous response
+  }
+
+  // Handle AI process snippet requests
+  if (request.action === 'AIprocessSnippet') {
+    if (aiHandler) {
+      aiHandler.processSnippet(request.snippet, request.emailSummary, (response) => {
+        sendResponse(response);
+      });
+      return true; // Required for asynchronous response
+    } else {
+      sendResponse({ modified: false, content: request.snippet });
+      return false;
+    }
+  }
+
+  // Handle AI process snippet requests
+  if (request.action === 'notificaiton') {
+    notificationService.showNotification({message: request});
     return true;
   }
 
-  return false;
-});
-
-// On installation of extension, initialize storage
-chrome.runtime.onInstalled.addListener(() => {
-  /*// Initialize AI settings
-  chrome.storage.local.set({ 
-    aiEnabled: false,
-    categories: ['General'] // Initialize with a default category
-  });*/
-  console.log('Extension and AI features initialized');
 });
 
 chrome.windows.onFocusChanged.addListener(windowId => {
@@ -242,9 +268,11 @@ chrome.windows.onFocusChanged.addListener(windowId => {
 
 function onBackgroundLoad() {
   console.log("Background script initialized/reloaded.");
-  if (!snippets){
-    getSnippets(snippets);
-    };
+  if (!snippets) {
+    getSnippets((snippets) => {
+      console.log('Snippets loaded on background load');
+    });
+  }
 }
 
 onBackgroundLoad();
