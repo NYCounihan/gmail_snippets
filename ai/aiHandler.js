@@ -71,11 +71,12 @@ export default class AIHandler {
         Subject: ${subject}
         Body: ${body}
 
-        Provide a brief summary that captures:
-        1. The main topic
-        2. The tone/sentiment
-        3. Key points or requests
-        4. Any specific context that might be relevant
+        Provide a very brief summary that captures:
+        1. The person's first name who sent the most recent email. This is the name of the person who the next response should be addressed to.
+        2. The main topic, key points & requests
+        3. Any specific context that might be relevant
+
+        This summary will be later used to update email templates to draft a tailored response.
       `;
 
       console.log('aihandler.js: this is the prompt ' + prompt);
@@ -137,7 +138,12 @@ export default class AIHandler {
       const prompt = `
       Original Snippet: ${snippet}  
       Email Summary: ${emailSummary}
-        Task: Modify this snippet to better fit the email context while maintaining the original intent.
+        Task: Update the original snippet to craft an email repsonse that maintains the original underlying intent and message of the snippet.
+              Make as few changes as possible. Do not invent any new information. Only modify the Original Snippet as little as necessary.
+              Do not include any other text in your response other than the email reply addressed to the person who sent the last email.
+              Your response will be directly inserted into the email. Be sure to address the email to the person who wrote the last email message.
+              The email response should include HTML line break characters (<br>) so that it will be formatted correctly when inserted into an email message.
+              The email should end with "best, Julian"
         Requirements:
         - Keep professional tone
         - Maintain key information

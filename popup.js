@@ -141,32 +141,43 @@ function createInsertButton(snippet) {
               console.log('AIprocessSnippet response:', aiSnippet);
 
               if (aiSnippet && aiSnippet.modified) {
-                if (confirm('AI has modified the snippet based on email context. Use modified version?')) {
-                  snippet.content = aiSnippet.content;
+                if (confirm('AI has modified the snippet based on email context. Use modified version? >>>> ' + aiSnippet.content)) {
+                  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    if (tabs.length > 0) {
+                      chrome.tabs.sendMessage(tabs[0].id, { action: 'insertSnippet', snippet: aiSnippet.content}, (response) => {
+                        if (chrome.runtime.lastError || !response || !response.success) {
+                          console.error('Failed to insert snippet:', chrome.runtime.lastError);
+                        } else {
+                          console.log('Snippet inserted successfully');
+                        }
+                      });
+                    }
+                  });
                 }
               }
             });
           } else {
-            console.warn('No email context available for AI processing');
+            console.warn('No email summary available for AI processing');
           }
         });
       } catch (error) {
         console.error('Failed to update snippet with AI:', error);
         // Continue with original snippet
       }
+    } else {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs.length > 0) {
+          chrome.tabs.sendMessage(tabs[0].id, { action: 'insertSnippet', snippet: snippet.content }, (response) => {
+            if (chrome.runtime.lastError || !response || !response.success) {
+              console.error('Failed to insert snippet:', chrome.runtime.lastError);
+            } else {
+              console.log('Snippet inserted successfully');
+            }
+          });
+        }
+      });
     }
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length > 0) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'insertSnippet', snippet: snippet.content }, (response) => {
-          if (chrome.runtime.lastError || !response || !response.success) {
-            console.error('Failed to insert snippet:', chrome.runtime.lastError);
-          } else {
-            console.log('Snippet inserted successfully');
-          }
-        });
-      }
-    });
   });
 
   return insertButton;
