@@ -34,7 +34,7 @@ function insertHTMLAtCursor(html) {
 }
 
 /* ===== Extract Email Details ===== */
-function extractEmailDetails() {
+function extractEmailDetails(maxLength = 1000) {
   let messageEl = null;
   // Try several selectors in order.
   const contentSelectors = [
@@ -78,17 +78,22 @@ function extractEmailDetails() {
     }
   }
 
-  chrome.runtime.sendMessage({ action: 'notification', message: 'Email extracted: ' + subjectElement ? subjectElement.innerText.trim() : '' });
+  // Limit the body and html content to the specified maxLength
+  const bodyContent = messageEl ? messageEl.innerText : '';
+  const htmlContent = messageEl ? messageEl.innerHTML : '';
+
+  chrome.runtime.sendMessage({ action: 'notification', message: 'Email extracted: ' + (subjectElement ? subjectElement.innerText.trim() : '') });
 
   return {
-    body: messageEl ? messageEl.innerText : '',
-    html: messageEl ? messageEl.innerHTML : '',
+    body: bodyContent.substring(0, maxLength),
+    html: htmlContent.substring(0, maxLength),
     from: fromElement ? (fromElement.getAttribute('email') || fromElement.textContent.trim()) : '',
     to: toValue,
     subject: subjectElement ? subjectElement.innerText.trim() : '',
     timestamp: new Date().toISOString()
   };
 }
+
 
 /* ===== Existing Monitor Email Activity ===== */
 function monitorEmailActivity() {
@@ -109,7 +114,7 @@ function monitorEmailActivity() {
     }
 
     if (aiEnabled) {
-      const emailDetails = extractEmailDetails();
+      const emailDetails = extractEmailDetails(4000);
 
       let flag = false;
 
@@ -145,14 +150,21 @@ function showSubtleNotification(status) {
 
   // Style the notification
   notificationDiv.style.position = 'fixed';
-  notificationDiv.style.top = '10px';
-  notificationDiv.style.right = '10px';
-  notificationDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-  notificationDiv.style.color = 'white';
-  notificationDiv.style.padding = '10px';
-  notificationDiv.style.borderRadius = '5px';
-  notificationDiv.style.zIndex = '10000';
-  notificationDiv.style.display = 'block';
+  notificationDiv.style.top = '0px'; // Position at the top
+  notificationDiv.style.left = '50%';
+  notificationDiv.style.transform = 'translateX(-50%)'; // Center horizontally
+  notificationDiv.style.backgroundColor = '#F5EDC2'; /* Pale yellow background */
+  notificationDiv.style.borderLeft = '2px solid #E5C577'; /* Golden yellow border on the left */
+  notificationDiv.style.borderBottom = '2px solid #E5C577'; /* Golden yellow border on the bottom */
+  notificationDiv.style.borderRight = '2px solid #E5C577'; /* Golden yellow border on the right */
+  notificationDiv.style.borderTop = 'none'; /* No border on the top */
+  notificationDiv.style.fontSize = '14px'; /* Medium text size */
+  notificationDiv.style.fontFamily = 'Arial, sans-serif'; /* Sans-serif font family */
+  notificationDiv.style.padding = '5px 10px'; /* Padding inside the box */
+  notificationDiv.style.minWidth = '150px'; /* Fixed width */
+  notificationDiv.style.textAlign = 'center'; /* Centered text */
+  notificationDiv.style.borderRadius = '5px'; /* Slightly rounded corners */
+  notificationDiv.style.zIndex = '10000'; /* Ensure it's on top of other elements */
 
   document.body.appendChild(notificationDiv);
 
@@ -217,7 +229,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   } else if (request.action === 'showSubtleNotification') {
     console.log('Message received in content.js: subtleNotification');
-    showSubtleNotification(request.status.message);
+    if (request.status.message) {
+      showSubtleNotification(request.status.message);
+    }
     sendResponse({ success: true });
   }
 

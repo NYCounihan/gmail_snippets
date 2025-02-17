@@ -8,8 +8,8 @@ Future Expansion:
 
 const DEFAULT_TIMEOUT = 10000;
 let controller = new AbortController();
-//const DEFAULT_TEMPERATURE = 0.7;
-//const DEFAULT_TOP_K = 40;
+const DEFAULT_TEMPERATURE = 0.5; // lower temperature to reduce variability
+const DEFAULT_TOP_K = 6; // higher K to increase range of word replacements
 
 export default class AIHandler {
   constructor() {
@@ -29,12 +29,11 @@ export default class AIHandler {
     // Create session with default parameters
     this.session = await this.aiNamespace.languageModel.create({
       systemPrompt: "You are a helpful assistant that improves email snippets to be more professional and context-appropriate.",
-      temperature: capabilities.defaultTemperature,
-      topK: capabilities.defaultTopK
+      temperature: DEFAULT_TEMPERATURE,
+      topK: DEFAULT_TOP_K
     });
 
     console.log('aiHandler: class initialized');
-    console.log(await this.session.prompt("say hello in a random fashion"));
   }
 
   async summarizeEmailContext(rawEmail) {
@@ -64,18 +63,30 @@ export default class AIHandler {
       }
 
       const prompt = `
-        Please summarize the following email context:
-        From: ${from}
-        To: ${to}
-        Subject: ${subject}
-        Body: ${body}
+        Summarize the following email exchange concisely. Extract only the most relevant details.
 
-        Provide a very brief summary that captures:
-        1. The person's first name who sent the most recent email. This is the name of the person who the next response should be addressed to.
-        2. The main topic, key points & requests
-        3. Any specific context that might be relevant
+        ### **Summary Structure:**
+        1. **Sender's First Name:** The first name of the most recent email sender. The response will be addressed to this person.
+        2. **Last Email Purpose:** A short phrase summarizing the primary purpose of the most recent email sent.
+        3. **Key Points & Requests:** The most important details, requests, or actions mentioned.
+        4. **Relevant Context:** Any prior discussions or background information needed to draft a contextual response.
 
-        This summary will be later used to update email templates to draft a tailored response.
+        **Output format:**
+        - Keep it professional and structured.
+        - Ensure clarity, avoiding unnecessary details.
+        - Use bullet points where appropriate.
+
+        ---
+
+        **Email Context:**
+        - **From:** ${from}
+        - **To:** ${to}
+        - **Subject:** ${subject}
+        - **Body:** ${body}
+
+        ---
+
+        This summary will be used to generate a tailored reply. Begin summarizing the email context:
       `;
 
       console.log('aihandler.js: this is the prompt ' + prompt);
@@ -144,19 +155,31 @@ export default class AIHandler {
       }
 
       const prompt = `
-      Original Snippet: ${snippet}  
-      Email Summary: ${emailSummary}
-        Task: Update the original snippet to craft an email response that maintains the original underlying intent and message of the snippet.
-              Make as few changes as possible. Do not invent any new information. Only modify the Original Snippet as little as necessary.
-              Do not include any other text in your response other than the email reply addressed to the person who sent the last email.
-              Your response will be directly inserted into the email. Be sure to address the email to the person who wrote the last email message.
-              The email response should include HTML line break characters (<br>) so that it will be formatted correctly when inserted into an email message.
-              The email should end with "best, Julian"
-        Requirements:
-        - Keep professional tone
-        - Maintain key information
-        - Adapt to conversation context
-        - Preserve any formatting
+
+        You are generating a **professional email reply** to the last email based on a provided email template and summary of the last email. **Follow these instructions strictly**:
+
+        - Modify the **Email Template** as little as possible while crafting the response.
+        - Do **not** introduce any new topics.
+        - Replace placeholders in [BRACKETS] with the correct information.
+        - Output **only the email text**—no explanations, disclaimers, or extra commentary.
+        - **Do not repeat the email summary** in your response.
+        - Use <br> for line breaks to ensure proper email formatting.
+        - Address the **original sender by their first name** (never "Julian").
+        - Ensure the email remains professional and in context.
+        - **End with:**  
+            best,<br>Julian
+
+        ---
+
+        **Original Email:**  
+        ${snippet}
+
+        **Email Summary:**  
+        ${emailSummary}
+
+        ---
+
+        Now, craft the email response:
       `;
 
       console.log('Updating snippet using AI and emailSummary:', prompt);
